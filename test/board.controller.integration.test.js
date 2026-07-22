@@ -141,6 +141,18 @@ describe("Board-Controller-Integration", () => {
     assert.ok(saved.boards["board-1"].columns[0].taskIds.includes(task.id));
   });
 
+  test("öffnet den globalen Task-Dialog auch ohne eine Stage namens backlog", () => {
+    const controller = startController();
+    controller.getState().columns[0].id = "ideas";
+    controller.render();
+
+    assert.doesNotThrow(() => findButton("+ Neue Aufgabe").click());
+
+    const form = document.querySelector(".task-form");
+    assert.ok(form instanceof HTMLFormElement);
+    assert.equal(form.elements.namedItem("columnId").value, "ideas");
+  });
+
   test("wechselt Boards, persistiert die Auswahl und blendet Owner-Aktionen für Mitglieder aus", () => {
     startController();
     const supportBoard = [...document.querySelectorAll(".board-link")]

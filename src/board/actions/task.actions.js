@@ -8,9 +8,13 @@ import { createBoardViewState } from "../board.view-state.js";
 /** @param {import("./action-context.js").BoardActionContext} context */
 export function createTaskActions(context) {
   return {
-    openCreateTask(columnId = "backlog") {
+    /** @param {string} [columnId] */
+    openCreateTask(columnId) {
       const state = context.state();
-      const requested = canAcceptTasks(state, columnId) ? columnId : null;
+      const requestedColumn = state.columns.find((column) => column.id === columnId);
+      const requested = requestedColumn && canAcceptTasks(state, requestedColumn.id)
+        ? requestedColumn.id
+        : null;
       const targetColumnId = requested ?? state.columns.find((column) => canAcceptTasks(state, column.id))?.id;
       if (!targetColumnId) return;
       const viewState = context.viewState();

@@ -158,7 +158,7 @@ export function createBoardPage(state, viewState, actions, workspace) {
                   class: "board-header__actions",
                   children: [
                     ...configurationButtons,
-                    { tagName: "button", type: "button", class: "button button--primary", text: "+ Neue Aufgabe", events: { click: () => actions.openCreateTask("backlog") } },
+                    { tagName: "button", type: "button", class: "button button--primary", text: "+ Neue Aufgabe", events: { click: () => actions.openCreateTask() } },
                   ],
                 },
               ],
@@ -322,7 +322,6 @@ function boardLink(board, activeBoardId, index, actions) {
     ],
   };
 }
-
 
 
 
