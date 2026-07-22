@@ -86,3 +86,27 @@ test("verwaltet den Dialogfokus per Tastatur", async ({ page }) => {
   await expect(dialog).toBeHidden();
   await expect(trigger).toBeFocused();
 });
+
+test("wendet Theme-Tokens und das mobile Layout an", async ({ page }) => {
+  const lightStyles = await page.evaluate(() => ({
+    page: getComputedStyle(document.documentElement).getPropertyValue("--color-page").trim(),
+    surface: getComputedStyle(document.documentElement).getPropertyValue("--color-surface").trim(),
+    card: getComputedStyle(document.querySelector(".task-card")).backgroundColor,
+  }));
+  expect(lightStyles).toEqual({ page: "#f4f5f7", surface: "#ffffff", card: "rgb(255, 255, 255)" });
+
+  await page.evaluate(() => { document.documentElement.dataset.theme = "dark"; });
+  const darkStyles = await page.evaluate(() => ({
+    page: getComputedStyle(document.documentElement).getPropertyValue("--color-page").trim(),
+    surface: getComputedStyle(document.documentElement).getPropertyValue("--color-surface").trim(),
+    cardImage: getComputedStyle(document.querySelector(".task-card")).backgroundImage,
+  }));
+  expect(darkStyles.page).toBe("#111521");
+  expect(darkStyles.surface).toBe("#1c2231");
+  expect(darkStyles.cardImage).toContain("linear-gradient");
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(page.locator(".sidebar")).toBeHidden();
+  await expect(page.locator(".topbar")).toHaveCSS("height", "58px");
+  await expect(page.locator(".workspace")).toHaveCSS("display", "block");
+});

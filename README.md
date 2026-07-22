@@ -137,10 +137,18 @@ index.html
     │   ├── board.map.js          Stabile öffentliche Template-Exports
     │   └── board/                Seite, Kanban, Dialoge und Konfiguration
     ├── features/                 Filter, Feedback und Einstellungen
-    └── styles/style.css          Responsive Light-/Dark-Styles
+    └── styles/
+        ├── style.css             Geordneter Stylesheet-Einstiegspunkt
+        ├── tokens.css            Farben, Abstände, Radien und Layout-Tokens
+        ├── base.css              Dokument- und Elementgrundlagen
+        ├── components.css        Layout- und Komponentenregeln
+        ├── themes.css            Dark-Theme-Verfeinerungen
+        └── responsive.css        Animationen und Breakpoints
 ```
 
 Die Anwendung trennt den dauerhaft gespeicherten Domain-State vom flüchtigen View-State. Geschäftsregeln wie WIP-Limits, Übergänge oder Todo-Abschlussbedingungen liegen in `board.state.js` und sind dadurch unabhängig von der Darstellung testbar.
+
+Die Styles folgen einer festen Importreihenfolge: Design-Tokens, Basisregeln, Komponenten, Theme und responsive Anpassungen. Komponenten verwenden semantische Custom Properties wie `--color-surface`, `--color-text-muted` und `--space-4`; das Theme überschreibt diese Werte zentral in `tokens.css`.
 
 JaDyDoCo übersetzt JavaScript-Objekte rekursiv in DOM-Strukturen. Der Controller verbindet diese deklarativen Templates mit dem Board-State und rendert nach relevanten Aktionen neu.
 
