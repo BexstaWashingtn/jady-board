@@ -119,6 +119,7 @@ index.html
     ├── board/
     │   ├── board.controller.js   UI-Aktionen und Orchestrierung
     │   ├── actions/              Fachliche Board-, Task-, Stage- und Benutzeraktionen
+    │   ├── board.dialog-manager.js Dialogfokus, Escape und Fokusfalle
     │   ├── board.state.js        Domain-State und Geschäftsregeln
     │   ├── board.view-state.js   Flüchtiger Zustand der Oberfläche
     │   ├── board.persistence.js  localStorage und Migrationen

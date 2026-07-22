@@ -380,4 +380,48 @@ describe("Board-Controller-Integration", () => {
     assert.equal(saved.users[user.id], undefined);
     assert.notEqual(saved.activeUserId, user.id);
   });
+
+  test("hält den Fokus im Dialog, schließt mit Escape und stellt den Auslöser wieder her", () => {
+    startController();
+    findButton("+ Neue Aufgabe").click();
+
+    const dialog = document.querySelector('[role="dialog"][aria-modal="true"]');
+    const workspace = document.querySelector(".workspace");
+    const title = document.querySelector("#task-title");
+    assert.ok(dialog instanceof HTMLElement);
+    assert.ok(workspace instanceof HTMLElement);
+    assert.ok(title instanceof HTMLInputElement);
+    assert.equal(document.activeElement, title);
+    assert.equal(workspace.inert, true);
+    assert.equal(workspace.getAttribute("aria-hidden"), "true");
+
+    const controls = [...dialog.querySelectorAll('button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])')]
+      .filter((element) => element instanceof HTMLElement);
+    const first = controls[0];
+    const last = controls[controls.length - 1];
+    last.focus();
+    document.dispatchEvent(new dom.window.KeyboardEvent("keydown", { key: "Tab", bubbles: true }));
+    assert.equal(document.activeElement, first);
+
+    document.dispatchEvent(new dom.window.KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+
+    assert.equal(document.querySelector('[role="dialog"][aria-modal="true"]'), null);
+    const restoredTrigger = [...document.querySelectorAll("button")]
+      .find((button) => button.textContent.trim() === "+ Neue Aufgabe");
+    assert.equal(document.activeElement, restoredTrigger);
+    assert.equal(document.querySelector(".workspace")?.inert, false);
+    assert.equal(document.querySelector(".workspace")?.hasAttribute("aria-hidden"), false);
+  });
+
+  test("destroy entfernt den zentralen Dialog-Listener und hebt inert auf", () => {
+    const controller = startController();
+    findButton("+ Neue Aufgabe").click();
+    assert.equal(document.querySelector(".workspace")?.inert, true);
+
+    controller.destroy();
+    document.dispatchEvent(new dom.window.KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+
+    assert.ok(document.querySelector('[role="dialog"][aria-modal="true"]'));
+    assert.equal(document.querySelector(".workspace")?.inert, false);
+  });
 });

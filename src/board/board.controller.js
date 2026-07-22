@@ -6,6 +6,7 @@ import { createStageActions } from "./actions/stage.actions.js";
 import { createTaskActions } from "./actions/task.actions.js";
 import { createUserActions } from "./actions/user.actions.js";
 import { ensureShowcaseData } from "./board.demo-data.js";
+import { createDialogManager } from "./board.dialog-manager.js";
 import { canConfigureBoard } from "./board.permissions.js";
 import { loadWorkspace, persistWorkspace } from "./board.persistence.js";
 import { createBoardViewState } from "./board.view-state.js";
@@ -60,10 +61,24 @@ export function createBoardController(app) {
     ...createFilterActions(context),
   };
 
+  const dialogManager = createDialogManager({ onEscape: closeActiveDialog });
+
   applyUserTheme();
-  colorScheme.addEventListener("change", () => {
+  colorScheme.addEventListener("change", handleColorSchemeChange);
+
+  function handleColorSchemeChange() {
     if (workspace.users[workspace.activeUserId].preferences.theme === "system") applyUserTheme();
-  });
+  }
+
+  function closeActiveDialog() {
+    if (overlays.appSettingsOpen) actions.closeAppSettings();
+    else if (overlays.userSettingsOpen) actions.closeUserSettings();
+    else if (overlays.boardCreateOpen) actions.closeCreateBoard();
+    else if (viewState.createTaskOpen) actions.closeCreateTask();
+    else if (viewState.selectedTaskId) actions.closeTask();
+    else if (viewState.stageConfigOpen) actions.closeStageConfig();
+    else if (viewState.boardConfigOpen) actions.closeBoardConfig();
+  }
 
   function isBoardOwner() {
     return canConfigureBoard(state, workspace.activeUserId);
@@ -87,6 +102,7 @@ export function createBoardController(app) {
   }
 
   function render() {
+    dialogManager.beforeRender();
     app.replace(createBoardPage(state, viewState, actions, {
       activeBoardId: workspace.activeBoardId,
       boards: Object.entries(workspace.boards).map(([id, board]) => ({ id, name: board.project.name })),
@@ -97,6 +113,7 @@ export function createBoardController(app) {
       users: Object.values(workspace.users),
       persistenceError,
     }));
+    dialogManager.afterRender();
   }
 
   function renderKanban() {
@@ -184,6 +201,12 @@ export function createBoardController(app) {
     return boardViewStates[boardId];
   }
 
+  function destroy() {
+    clearUndoTimer();
+    colorScheme.removeEventListener("change", handleColorSchemeChange);
+    dialogManager.destroy();
+  }
+
   render();
-  return { getState: () => state, actions, render };
+  return { getState: () => state, actions, render, destroy };
 }
