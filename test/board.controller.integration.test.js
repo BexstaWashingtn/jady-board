@@ -63,6 +63,44 @@ function submit(form) {
   form.dispatchEvent(new dom.window.Event("submit", { bubbles: true, cancelable: true }));
 }
 
+function switchToBoard(name) {
+  const board = [...document.querySelectorAll(".board-link")]
+    .find((link) => link.textContent.includes(name));
+  assert.ok(board, `Board "${name}" wurde nicht gerendert.`);
+  board.click();
+}
+
+function dragTransfer() {
+  const values = new Map();
+  return {
+    effectAllowed: "none",
+    dropEffect: "none",
+    setData(type, value) { values.set(type, String(value)); },
+    getData(type) { return values.get(type) ?? ""; },
+  };
+}
+
+function dragEvent(currentTarget, dataTransfer, clientY = 0) {
+  return {
+    currentTarget,
+    dataTransfer,
+    clientY,
+    preventDefault() {},
+  };
+}
+
+function taskCard(taskId) {
+  const card = document.querySelector(`.task-card[data-task-id="${taskId}"]`);
+  assert.ok(card instanceof HTMLElement, `Task "${taskId}" wurde nicht gerendert.`);
+  return card;
+}
+
+function column(columnId) {
+  const target = document.querySelector(`.kanban-column[data-status="${columnId}"]`);
+  assert.ok(target instanceof HTMLElement, `Stage "${columnId}" wurde nicht gerendert.`);
+  return target;
+}
+
 describe("Board-Controller-Integration", () => {
   test("initialisiert Workspace, Showcase-Daten und Board-Oberfläche", () => {
     startController();
@@ -162,5 +200,73 @@ describe("Board-Controller-Integration", () => {
     assert.equal(document.querySelector(".persistence-warning"), null);
     const saved = JSON.parse(localStorage.getItem(BOARD_STORAGE_KEY));
     assert.equal(saved.boards["board-1"].tasks[task.id].title, "Ungespeicherte Aufgabe");
+  });
+
+  test("verschiebt eine Aufgabe per Drag-and-drop, persistiert und macht die Aktion rückgängig", () => {
+    const controller = startController();
+    switchToBoard("Product Launch");
+    const transfer = dragTransfer();
+
+    controller.actions.startTaskDrag(dragEvent(taskCard("LAUNCH-01"), transfer), "LAUNCH-01");
+    const target = column("planning");
+    controller.actions.dragTaskOverColumn(dragEvent(target, transfer), "planning");
+
+    assert.equal(target.classList.contains("kanban-column--drop-target"), true);
+    controller.actions.dropTask(dragEvent(target, transfer), "planning");
+
+    assert.equal(controller.getState().columns.find(({ id }) => id === "planning").taskIds.includes("LAUNCH-01"), true);
+    assert.match(document.querySelector(".snackbar")?.textContent ?? "", /LAUNCH-01.*In Umsetzung.*verschoben/);
+    let saved = JSON.parse(localStorage.getItem(BOARD_STORAGE_KEY));
+    assert.equal(saved.boards["demo-launch"].columns.find(({ id }) => id === "planning").taskIds.includes("LAUNCH-01"), true);
+
+    findButton("Rückgängig").click();
+
+    assert.equal(controller.getState().columns.find(({ id }) => id === "ideas").taskIds.includes("LAUNCH-01"), true);
+    saved = JSON.parse(localStorage.getItem(BOARD_STORAGE_KEY));
+    assert.equal(saved.boards["demo-launch"].columns.find(({ id }) => id === "ideas").taskIds.includes("LAUNCH-01"), true);
+  });
+
+  test("weist einen nicht erlaubten Stage-Übergang mit verständlichem Feedback ab", () => {
+    const controller = startController();
+    switchToBoard("Product Launch");
+    const transfer = dragTransfer();
+
+    controller.actions.startTaskDrag(dragEvent(taskCard("LAUNCH-05"), transfer), "LAUNCH-05");
+    const target = column("review");
+    controller.actions.dragTaskOverColumn(dragEvent(target, transfer), "review");
+
+    assert.equal(target.classList.contains("kanban-column--drop-rejected"), true);
+    assert.equal(target.dataset.dropRejection, "Übergang nicht erlaubt");
+    controller.actions.dropTask(dragEvent(target, transfer), "review");
+
+    assert.equal(controller.getState().columns.find(({ id }) => id === "live").taskIds.includes("LAUNCH-05"), true);
+    assert.equal(controller.getState().columns.find(({ id }) => id === "review").taskIds.includes("LAUNCH-05"), false);
+    assert.match(document.querySelector(".snackbar--notice")?.textContent ?? "", /erlaubt keinen Übergang.*Freigabe/);
+    controller.actions.dismissNotice();
+  });
+
+  test("markiert ein erreichtes hartes WIP-Limit und blockiert den Drop", () => {
+    const controller = startController();
+    switchToBoard("Support Operations");
+
+    const firstTransfer = dragTransfer();
+    controller.actions.startTaskDrag(dragEvent(taskCard("SUP-31"), firstTransfer), "SUP-31");
+    controller.actions.dropTask(dragEvent(column("triage"), firstTransfer), "triage");
+    assert.equal(controller.getState().columns.find(({ id }) => id === "triage").taskIds.length, 2);
+    controller.actions.dismissUndo();
+
+    const secondTransfer = dragTransfer();
+    controller.actions.startTaskDrag(dragEvent(taskCard("SUP-32"), secondTransfer), "SUP-32");
+    const fullTarget = column("triage");
+    controller.actions.dragTaskOverColumn(dragEvent(fullTarget, secondTransfer), "triage");
+
+    assert.equal(fullTarget.classList.contains("kanban-column--drop-rejected"), true);
+    assert.equal(fullTarget.dataset.dropRejection, "WIP-Limit erreicht");
+    controller.actions.dropTask(dragEvent(fullTarget, secondTransfer), "triage");
+
+    assert.equal(controller.getState().columns.find(({ id }) => id === "inbox").taskIds.includes("SUP-32"), true);
+    assert.equal(controller.getState().columns.find(({ id }) => id === "triage").taskIds.includes("SUP-32"), false);
+    const saved = JSON.parse(localStorage.getItem(BOARD_STORAGE_KEY));
+    assert.equal(saved.boards["demo-support"].columns.find(({ id }) => id === "triage").taskIds.includes("SUP-32"), false);
   });
 });

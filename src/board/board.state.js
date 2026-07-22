@@ -295,7 +295,14 @@ export function createDeleteUndo(state, taskId) {
  */
 export function applyUndo(state, command) {
   if (command.type === "move-task") {
-    moveTask(state, command.taskId, command.columnId, command.index);
+    if (!state.tasks[command.taskId]) throw new Error(`Board: task "${command.taskId}" not found.`);
+    const column = state.columns.find(({ id }) => id === command.columnId);
+    if (!column) throw new Error(`Board: column "${command.columnId}" not found.`);
+    state.columns.forEach((item) => {
+      item.taskIds = item.taskIds.filter((id) => id !== command.taskId);
+    });
+    const index = Math.max(0, Math.min(command.index, column.taskIds.length));
+    column.taskIds.splice(index, 0, command.taskId);
     return;
   }
 
