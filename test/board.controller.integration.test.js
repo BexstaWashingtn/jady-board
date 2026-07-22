@@ -20,6 +20,7 @@ beforeEach(() => {
   };
   dom.window.matchMedia = () => mediaQuery;
   dom.window.confirm = () => true;
+  dom.window.HTMLElement.prototype.scrollIntoView = () => {};
 
   const browserGlobals = {
     window: dom.window,
@@ -268,5 +269,115 @@ describe("Board-Controller-Integration", () => {
     assert.equal(controller.getState().columns.find(({ id }) => id === "triage").taskIds.includes("SUP-32"), false);
     const saved = JSON.parse(localStorage.getItem(BOARD_STORAGE_KEY));
     assert.equal(saved.boards["demo-support"].columns.find(({ id }) => id === "triage").taskIds.includes("SUP-32"), false);
+  });
+
+  test("erstellt, bearbeitet, verschiebt und löscht eine Stage über die Konfiguration", () => {
+    const controller = startController();
+    findButton("Stages konfigurieren").click();
+    findButton("+ Stage hinzufügen").click();
+
+    let form = document.querySelector("#stage-editor");
+    assert.ok(form instanceof HTMLFormElement);
+    form.elements.namedItem("title").value = "Abnahme";
+    form.elements.namedItem("color").value = "#336699";
+    form.elements.namedItem("kind").value = "review";
+    form.elements.namedItem("limit").value = "2";
+    form.elements.namedItem("limitMode").disabled = false;
+    form.elements.namedItem("limitMode").value = "strict";
+    submit(form);
+
+    let stage = controller.getState().columns.find(({ title }) => title === "Abnahme");
+    assert.ok(stage);
+    assert.deepEqual(
+      { color: stage.color, kind: stage.kind, limit: stage.limit, limitMode: stage.limitMode },
+      { color: "#336699", kind: "review", limit: 2, limitMode: "strict" },
+    );
+
+    controller.actions.editStage(stage.id);
+    form = document.querySelector("#stage-editor");
+    assert.ok(form instanceof HTMLFormElement);
+    form.elements.namedItem("title").value = "Freigabe";
+    submit(form);
+    stage = controller.getState().columns.find(({ id }) => id === stage.id);
+    assert.equal(stage.title, "Freigabe");
+
+    const oldIndex = controller.getState().columns.findIndex(({ id }) => id === stage.id);
+    controller.actions.moveStage(stage.id, -1);
+    assert.equal(controller.getState().columns.findIndex(({ id }) => id === stage.id), oldIndex - 1);
+
+    controller.actions.requestDeleteStage(stage.id);
+    const deleteForm = document.querySelector(".stage-editor--delete");
+    assert.ok(deleteForm instanceof HTMLFormElement);
+    submit(deleteForm);
+
+    assert.equal(controller.getState().columns.some(({ id }) => id === stage.id), false);
+    const saved = JSON.parse(localStorage.getItem(BOARD_STORAGE_KEY));
+    assert.equal(saved.boards["board-1"].columns.some(({ id }) => id === stage.id), false);
+  });
+
+  test("verwaltet Todos über die Task-Detailansicht und persistiert jede Änderung", () => {
+    const controller = startController();
+    taskCard("KAN-18").click();
+
+    const newTodo = document.querySelector("#new-todo");
+    assert.ok(newTodo instanceof HTMLInputElement);
+    newTodo.value = "Akzeptanzkriterien prüfen";
+    findButton("Hinzufügen").click();
+
+    let task = controller.getState().tasks["KAN-18"];
+    const todo = task.todos.find(({ text }) => text === "Akzeptanzkriterien prüfen");
+    assert.ok(todo);
+    let row = [...document.querySelectorAll(".todo-row")]
+      .find((candidate) => candidate.querySelector('input[type="text"]')?.value === "Akzeptanzkriterien prüfen");
+    assert.ok(row);
+    const checkbox = row.querySelector('input[type="checkbox"]');
+    assert.ok(checkbox instanceof HTMLInputElement);
+    checkbox.checked = true;
+    checkbox.dispatchEvent(new dom.window.Event("change", { bubbles: true }));
+    assert.equal(task.todos.find(({ id }) => id === todo.id).completed, true);
+
+    row = [...document.querySelectorAll(".todo-row")]
+      .find((candidate) => candidate.querySelector('input[type="text"]')?.value === "Akzeptanzkriterien prüfen");
+    const textInput = row?.querySelector('input[type="text"]');
+    assert.ok(textInput instanceof HTMLInputElement);
+    textInput.value = "Akzeptanzkriterien bestätigen";
+    textInput.dispatchEvent(new dom.window.Event("change", { bubbles: true }));
+    assert.equal(task.todos.find(({ id }) => id === todo.id).text, "Akzeptanzkriterien bestätigen");
+
+    const deleteButton = row.querySelector("button");
+    assert.ok(deleteButton instanceof HTMLButtonElement);
+    deleteButton.click();
+    task = controller.getState().tasks["KAN-18"];
+    assert.equal(task.todos.some(({ id }) => id === todo.id), false);
+    const saved = JSON.parse(localStorage.getItem(BOARD_STORAGE_KEY));
+    assert.equal(saved.boards["board-1"].tasks["KAN-18"].todos.some(({ id }) => id === todo.id), false);
+  });
+
+  test("erstellt, bearbeitet, wechselt und löscht ein lokales Benutzerprofil", () => {
+    startController();
+    document.querySelector('[aria-label="Benutzerprofil öffnen"]')?.click();
+
+    const createForm = document.querySelector(".user-form--new");
+    assert.ok(createForm instanceof HTMLFormElement);
+    createForm.elements.namedItem("name").value = "Ada Lovelace";
+    createForm.elements.namedItem("initials").value = "AL";
+    submit(createForm);
+
+    let saved = JSON.parse(localStorage.getItem(BOARD_STORAGE_KEY));
+    const user = Object.values(saved.users).find(({ name }) => name === "Ada Lovelace");
+    assert.ok(user);
+    assert.equal(saved.activeUserId, user.id);
+
+    const profileForm = document.querySelector(".user-form:not(.user-form--new)");
+    assert.ok(profileForm instanceof HTMLFormElement);
+    profileForm.elements.namedItem("name").value = "Ada Byron";
+    submit(profileForm);
+    saved = JSON.parse(localStorage.getItem(BOARD_STORAGE_KEY));
+    assert.equal(saved.users[user.id].name, "Ada Byron");
+
+    findButton("Benutzer löschen").click();
+    saved = JSON.parse(localStorage.getItem(BOARD_STORAGE_KEY));
+    assert.equal(saved.users[user.id], undefined);
+    assert.notEqual(saved.activeUserId, user.id);
   });
 });
