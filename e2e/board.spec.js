@@ -110,3 +110,51 @@ test("wendet Theme-Tokens und das mobile Layout an", async ({ page }) => {
   await expect(page.locator(".topbar")).toHaveCSS("height", "58px");
   await expect(page.locator(".workspace")).toHaveCSS("display", "block");
 });
+
+test("exportiert und importiert den vollständigen Workspace mit Vorschau", async ({ page }) => {
+  await page.getByRole("button", { name: "JaDyBoard Einstellungen" }).click();
+  const settings = page.getByRole("dialog", { name: "Einstellungen" });
+
+  const downloadPromise = page.waitForEvent("download");
+  await settings.getByRole("button", { name: "Workspace exportieren" }).click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toMatch(/^jady-board-backup-\d{4}-\d{2}-\d{2}\.json$/);
+  const backup = JSON.parse(await download.createReadStream().then(async (stream) => {
+    const chunks = [];
+    for await (const chunk of stream) chunks.push(chunk);
+    return Buffer.concat(chunks).toString("utf8");
+  }));
+  expect(backup.format).toBe("jady-board-backup");
+  expect(backup.workspace.boards["board-1"].project.name).toBe("Product Board");
+
+  backup.workspace.boards["board-1"].project.name = "Importiertes Board";
+  await settings.locator("#workspace-backup-file").setInputFiles({
+    name: "workspace.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(JSON.stringify(backup)),
+  });
+
+  await expect(settings.getByRole("heading", { name: /Backup vom/ })).toBeVisible();
+  await expect(settings).toContainText("3 Boards");
+  await settings.getByRole("button", { name: "Workspace ersetzen" }).click();
+
+  await expect(page.getByRole("heading", { level: 1, name: "Importiertes Board" })).toBeVisible();
+  await expect(page.getByText("Backup erfolgreich importiert.")).toBeVisible();
+  const safetyBackup = await page.evaluate(() => JSON.parse(localStorage.getItem("jadydoco.board.backup")));
+  expect(safetyBackup.boards["board-1"].project.name).toBe("Product Board");
+});
+
+test("weist eine ungültige Importdatei ab, ohne den Workspace zu verändern", async ({ page }) => {
+  await page.getByRole("button", { name: "JaDyBoard Einstellungen" }).click();
+  const settings = page.getByRole("dialog", { name: "Einstellungen" });
+  await settings.locator("#workspace-backup-file").setInputFiles({
+    name: "invalid.json",
+    mimeType: "application/json",
+    buffer: Buffer.from("{invalid"),
+  });
+
+  await expect(settings.getByRole("alert")).toContainText("kein gültiges JSON");
+  await expect(settings.getByRole("button", { name: "Workspace ersetzen" })).toHaveCount(0);
+  await settings.getByRole("button", { name: "Einstellungen schließen" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Product Board" })).toBeVisible();
+});

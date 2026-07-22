@@ -105,6 +105,25 @@
   color: #dfbf77;
   background: rgba(229, 168, 75, 0.12);
 }
+[data-theme="dark"] .app-settings-section + .app-settings-section,
+[data-theme="dark"] .app-settings-section select {
+  border-color: var(--color-border);
+}
+[data-theme="dark"] .app-settings-section select {
+  color: var(--color-text);
+  background: var(--color-surface-subtle);
+}
+[data-theme="dark"] .backup-preview {
+  border-color: #4a426f;
+  background: #211f2b;
+}
+[data-theme="dark"] .backup-error {
+  color: #ffb2b2;
+  background: #392326;
+}
+[data-theme="dark"] .backup-warning {
+  color: #dfbf77;
+}
 
 /* Midnight surfaces and elevation */
 [data-theme="dark"] html,

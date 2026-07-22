@@ -1405,6 +1405,59 @@
 .user-settings-body {
   padding: 20px 26px 26px;
 }
+.app-settings-section + .app-settings-section {
+  margin-top: var(--space-6);
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--color-border);
+}
+.app-settings-section h3,
+.backup-preview h4 {
+  margin: 0 0 var(--space-3);
+}
+.app-settings-section select {
+  width: 100%;
+  min-height: 40px;
+  padding: 0 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+}
+.backup-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.backup-status,
+.backup-error,
+.backup-warning,
+.backup-preview p {
+  font-size: 0.72rem;
+  line-height: 1.5;
+}
+.backup-status {
+  margin: var(--space-3) 0 0;
+  color: var(--color-text-muted);
+}
+.backup-error {
+  margin: var(--space-3) 0 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  color: #9e3737;
+  background: #fff0f0;
+}
+.backup-preview {
+  margin-top: var(--space-4);
+  padding: var(--space-4);
+  border: 1px solid #ded8ff;
+  border-radius: var(--radius-md);
+  background: #faf9ff;
+}
+.backup-preview p {
+  margin: 0 0 var(--space-3);
+}
+.backup-warning {
+  color: #756b45;
+}
 .user-list {
   display: flex;
   flex-wrap: wrap;

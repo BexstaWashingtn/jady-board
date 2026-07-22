@@ -2,7 +2,12 @@
 export function createUserActions(context) {
   return {
     openAppSettings() { context.overlays.appSettingsOpen = true; context.render(); },
-    closeAppSettings() { context.overlays.appSettingsOpen = false; context.render(); },
+    closeAppSettings() {
+      context.overlays.appSettingsOpen = false;
+      context.overlays.transfer.preview = null;
+      context.overlays.transfer.error = null;
+      context.render();
+    },
     openUserSettings() { context.overlays.userSettingsOpen = true; context.render(); },
     closeUserSettings() { context.overlays.userSettingsOpen = false; context.render(); },
 

@@ -10,7 +10,7 @@
  * @property {(viewState: import("../board.view-state.js").BoardViewState) => void} setViewState
  * @property {import("../board.persistence.js").BoardWorkspace} workspace
  * @property {Record<string, import("../board.view-state.js").BoardViewState>} boardViewStates
- * @property {{ boardCreateOpen: boolean, userSettingsOpen: boolean, appSettingsOpen: boolean }} overlays
+ * @property {{ boardCreateOpen: boolean, userSettingsOpen: boolean, appSettingsOpen: boolean, transfer: { preview: import("../board.transfer.js").ImportPreview | null, error: string | null, lastExportedAt: string | null } }} overlays
  * @property {{ taskOpenUntil: number }} interaction
  * @property {() => void} render
  * @property {() => void} renderKanban

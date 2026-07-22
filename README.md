@@ -42,6 +42,13 @@ Das Projekt läuft vollständig im Browser. Boards, Aufgaben, Benutzerprofile un
 - Helles, dunkles oder vom Betriebssystem übernommenes Farbschema verwenden
 - Responsive Oberfläche für Desktop und kleinere Bildschirme
 
+### Datensicherung
+
+- Den vollständigen Workspace als versionierte JSON-Datei exportieren
+- Backups vor dem Import validieren und als Zusammenfassung anzeigen
+- Boards, Aufgaben, Benutzerprofile und Einstellungen gemeinsam wiederherstellen
+- Den aktuellen Workspace vor jedem bestätigten Import automatisch sichern
+
 ## Bedienung
 
 ### Ein Board erstellen
@@ -130,6 +137,7 @@ index.html
     │   ├── board.state.js        Domain-State und Geschäftsregeln
     │   ├── board.view-state.js   Flüchtiger Zustand der Oberfläche
     │   ├── board.persistence.js  localStorage und Migrationen
+    │   ├── board.transfer.js     Backup-Format, Export und Importvalidierung
     │   ├── board.permissions.js  Zentrale Berechtigungsregeln
     │   ├── board.demo-data.js    Mitgelieferte Showcase-Boards
     │   └── board.dom.js          Gezielte DOM-Aktualisierungen
@@ -166,7 +174,7 @@ Der komplette Workspace wird als JSON im `localStorage` des Browsers unter dem S
 
 Beim Laden werden Workspace, Benutzer, Boards, Stages, Aufgaben und Todos gegen die aktuelle Schema-Version validiert. Reparierbare Inkonsistenzen wie doppelte oder verwaiste Task-Zuordnungen und ungültige Benutzerreferenzen werden automatisch bereinigt. Vor einer Migration oder Reparatur bleibt der ursprüngliche Eintrag unter `jadydoco.board.backup` erhalten. Daten aus einer neueren, unbekannten Schema-Version werden nicht überschrieben.
 
-Wichtig: Es gibt derzeit kein Backend, keine Cloud-Synchronisierung und keinen automatischen Export. Das Leeren der Browserdaten löscht daher auch die lokal gespeicherten Boards.
+Wichtig: Es gibt derzeit kein Backend, keine Cloud-Synchronisierung und keinen automatischen Export. Manuelle Backups können unter **JaDyBoard Einstellungen → Daten & Backup** erstellt und wieder eingelesen werden. Ohne ein solches Backup löscht das Leeren der Browserdaten auch die lokal gespeicherten Boards.
 
 ## Datenmodell in Kurzform
 
@@ -194,7 +202,7 @@ Die Anwendung setzt moderne Browser-APIs voraus, insbesondere ES-Module, `struct
 - Daten werden ausschließlich lokal im aktuellen Browser gespeichert.
 - Es gibt keine Anmeldung, Zugriffskontrolle oder Mehrgeräte-Synchronisierung.
 - Gleichzeitige Bearbeitung durch mehrere Personen wird nicht unterstützt.
-- Import, Export und automatische Backups sind noch nicht vorhanden.
+- Automatische oder zeitgesteuerte Backups sind nicht vorhanden; Exporte müssen manuell ausgelöst werden.
 - Benutzerprofile simulieren Teamrollen nur innerhalb des lokalen Workspace.
 
 ## Technologien

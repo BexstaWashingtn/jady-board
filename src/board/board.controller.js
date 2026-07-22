@@ -4,6 +4,7 @@ import { createDragDropActions } from "./actions/drag-drop.actions.js";
 import { createFilterActions } from "./actions/filter.actions.js";
 import { createStageActions } from "./actions/stage.actions.js";
 import { createTaskActions } from "./actions/task.actions.js";
+import { createTransferActions } from "./actions/transfer.actions.js";
 import { createUserActions } from "./actions/user.actions.js";
 import { ensureShowcaseData } from "./board.demo-data.js";
 import { createDialogManager } from "./board.dialog-manager.js";
@@ -19,7 +20,12 @@ export function createBoardController(app) {
   /** @type {Record<string, import("./board.view-state.js").BoardViewState>} */
   const boardViewStates = {};
   let viewState = getBoardViewState(workspace.activeBoardId);
-  const overlays = { boardCreateOpen: false, userSettingsOpen: false, appSettingsOpen: false };
+  const overlays = {
+    boardCreateOpen: false,
+    userSettingsOpen: false,
+    appSettingsOpen: false,
+    transfer: { preview: null, error: null, lastExportedAt: null },
+  };
   const interaction = { taskOpenUntil: 0 };
   const colorScheme = window.matchMedia("(prefers-color-scheme: dark)");
   /** @type {ReturnType<typeof setTimeout> | null} */
@@ -59,6 +65,7 @@ export function createBoardController(app) {
     ...createTaskActions(context),
     ...createDragDropActions(context),
     ...createFilterActions(context),
+    ...createTransferActions(context),
   };
 
   const dialogManager = createDialogManager({ onEscape: closeActiveDialog });
@@ -112,6 +119,7 @@ export function createBoardController(app) {
       activeUserId: workspace.activeUserId,
       users: Object.values(workspace.users),
       persistenceError,
+      transfer: overlays.transfer,
     }));
     dialogManager.afterRender();
   }

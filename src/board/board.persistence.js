@@ -224,9 +224,19 @@ export function persistWorkspace(workspace) {
 }
 
 /** @param {BoardWorkspace} workspace */
-function serializeWorkspace(workspace) {
+export function serializeWorkspace(workspace) {
   const boards = Object.fromEntries(Object.entries(workspace.boards).map(([id, state]) => [id, { project: state.project, columns: state.columns, tasks: state.tasks }]));
   return JSON.stringify({ version: BOARD_SCHEMA_VERSION, activeBoardId: workspace.activeBoardId, boards, activeUserId: workspace.activeUserId, users: workspace.users });
+}
+
+/** @param {BoardWorkspace} workspace @returns {boolean} */
+export function backupWorkspace(workspace) {
+  try {
+    localStorage.setItem(BOARD_BACKUP_STORAGE_KEY, serializeWorkspace(workspace));
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /** @param {string} original */

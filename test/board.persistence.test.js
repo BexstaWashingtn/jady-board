@@ -3,6 +3,7 @@ import { beforeEach, describe, test } from "node:test";
 
 import {
   BOARD_BACKUP_STORAGE_KEY,
+  backupWorkspace,
   loadWorkspace,
   persistWorkspace,
 } from "../src/board/board.persistence.js";
@@ -46,6 +47,15 @@ describe("Board-Persistenz", () => {
     assert.equal(BOARD_STORAGE_KEY, "jadydoco.board");
     assert.equal(saved.version, BOARD_SCHEMA_VERSION);
     assert.equal(values.has(LEGACY_BOARD_STORAGE_KEY), false);
+  });
+
+  test("legt vor einem Import ein kanonisches Workspace-Backup an", () => {
+    const current = workspace();
+
+    assert.equal(backupWorkspace(current), true);
+    const backup = JSON.parse(values.get(BOARD_BACKUP_STORAGE_KEY));
+    assert.equal(backup.version, BOARD_SCHEMA_VERSION);
+    assert.equal(backup.boards["board-1"].project.name, "Product Board");
   });
 
   test("übernimmt Daten vom alten Key und entfernt ihn nach erfolgreicher Migration", () => {

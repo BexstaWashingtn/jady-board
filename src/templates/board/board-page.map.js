@@ -11,7 +11,7 @@ import { createBoardDialog, createTaskDetails, createTaskDialog } from "./dialog
  * @param {import("../../board/board.state.js").BoardState} state
  * @param {import("../../board/board.view-state.js").BoardViewState} viewState
  * @param {import("./board.types.js").BoardActions} actions
- * @param {{ activeBoardId: string, boards: Array<{id: string, name: string}>, createOpen: boolean, userSettingsOpen: boolean, appSettingsOpen: boolean, activeUserId: string, users: Array<{id: string, name: string, initials: string, preferences: {theme: string}}>, persistenceError: boolean }} workspace
+ * @param {{ activeBoardId: string, boards: Array<{id: string, name: string}>, createOpen: boolean, userSettingsOpen: boolean, appSettingsOpen: boolean, activeUserId: string, users: Array<{id: string, name: string, initials: string, preferences: {theme: string}}>, persistenceError: boolean, transfer: { preview: import("../../board/board.transfer.js").ImportPreview | null, error: string | null, lastExportedAt: string | null } }} workspace
  * @returns {import("../../core/JaDyDoCo.js").JaDyNode}
  */
 export function createBoardPage(state, viewState, actions, workspace) {
@@ -322,6 +322,5 @@ function boardLink(board, activeBoardId, index, actions) {
     ],
   };
 }
-
 
 
