@@ -145,6 +145,8 @@ Der komplette Workspace wird als JSON im `localStorage` des Browsers unter dem S
 
 Ältere Daten vom Schlüssel `jadydoco.board.v1` werden beim Laden migriert. Ist der Speicher nicht verfügbar oder sind Daten beschädigt, bleibt die App nutzbar und startet mit dem Standardzustand.
 
+Beim Laden werden Workspace, Benutzer, Boards, Stages, Aufgaben und Todos gegen die aktuelle Schema-Version validiert. Reparierbare Inkonsistenzen wie doppelte oder verwaiste Task-Zuordnungen und ungültige Benutzerreferenzen werden automatisch bereinigt. Vor einer Migration oder Reparatur bleibt der ursprüngliche Eintrag unter `jadydoco.board.backup` erhalten. Daten aus einer neueren, unbekannten Schema-Version werden nicht überschrieben.
+
 Wichtig: Es gibt derzeit kein Backend, keine Cloud-Synchronisierung und keinen automatischen Export. Das Leeren der Browserdaten löscht daher auch die lokal gespeicherten Boards.
 
 ## Datenmodell in Kurzform

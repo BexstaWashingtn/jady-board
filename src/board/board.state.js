@@ -11,7 +11,7 @@
 
 export const BOARD_STORAGE_KEY = "jadydoco.board";
 export const LEGACY_BOARD_STORAGE_KEY = "jadydoco.board.v1";
-export const BOARD_SCHEMA_VERSION = 3;
+export const BOARD_SCHEMA_VERSION = 4;
 
 /** @type {BoardState} */
 export const initialBoardState = {

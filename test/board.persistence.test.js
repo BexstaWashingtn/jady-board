@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import { beforeEach, describe, test } from "node:test";
 
-import { loadWorkspace, persistWorkspace } from "../src/board/board.persistence.js";
+import {
+  BOARD_BACKUP_STORAGE_KEY,
+  loadWorkspace,
+  persistWorkspace,
+} from "../src/board/board.persistence.js";
 import {
   BOARD_SCHEMA_VERSION,
   BOARD_STORAGE_KEY,
@@ -71,5 +75,68 @@ describe("Board-Persistenz", () => {
 
     assert.equal(loadWorkspace().boards["board-1"].project.name, "Aktuell");
     assert.equal(values.has(LEGACY_BOARD_STORAGE_KEY), true);
+  });
+
+  test("repariert inkonsistente Referenzen und sichert das Original", () => {
+    const damaged = workspace();
+    damaged.version = 3;
+    damaged.activeUserId = "missing-user";
+    damaged.boards["board-1"].project.ownerId = "missing-user";
+    damaged.boards["board-1"].project.memberIds = ["missing-user", "user-1"];
+    damaged.boards["board-1"].columns[0].taskIds = ["KAN-18", "KAN-18", "missing-task"];
+    damaged.boards["board-1"].columns[1].taskIds.push("KAN-18");
+    damaged.boards["board-1"].tasks["KAN-21"].ownerId = "missing-user";
+    damaged.boards["board-1"].tasks["KAN-21"].memberIds = ["missing-user", "user-1", "user-1"];
+    const original = JSON.stringify(damaged);
+    values.set(BOARD_STORAGE_KEY, original);
+
+    const loaded = loadWorkspace();
+    const board = loaded.boards["board-1"];
+    const occurrences = board.columns.flatMap(({ taskIds }) => taskIds)
+      .filter((id) => id === "KAN-18").length;
+
+    assert.equal(loaded.activeUserId, "user-1");
+    assert.equal(board.project.ownerId, "user-1");
+    assert.deepEqual(board.project.memberIds, ["user-1"]);
+    assert.equal(occurrences, 1);
+    assert.equal(board.columns.some(({ taskIds }) => taskIds.includes("missing-task")), false);
+    assert.equal(board.tasks["KAN-21"].ownerId, null);
+    assert.deepEqual(board.tasks["KAN-21"].memberIds, ["user-1"]);
+    assert.equal(values.get(BOARD_BACKUP_STORAGE_KEY), original);
+    assert.equal(JSON.parse(values.get(BOARD_STORAGE_KEY)).version, BOARD_SCHEMA_VERSION);
+  });
+
+  test("ordnet gültige verwaiste Tasks der ersten Stage zu", () => {
+    const saved = workspace();
+    saved.version = BOARD_SCHEMA_VERSION;
+    saved.boards["board-1"].columns.forEach((column) => {
+      column.taskIds = column.taskIds.filter((id) => id !== "KAN-18");
+    });
+    values.set(BOARD_STORAGE_KEY, JSON.stringify(saved));
+
+    const loaded = loadWorkspace();
+
+    assert.equal(loaded.boards["board-1"].columns[0].taskIds.includes("KAN-18"), true);
+  });
+
+  test("fällt bei ungültigem JSON sicher zurück und bewahrt die Rohdaten", () => {
+    values.set(BOARD_STORAGE_KEY, "{invalid-json");
+
+    const loaded = loadWorkspace();
+
+    assert.equal(loaded.activeBoardId, "board-1");
+    assert.equal(values.get(BOARD_BACKUP_STORAGE_KEY), "{invalid-json");
+  });
+
+  test("überschreibt Daten einer neueren Schema-Version nicht", () => {
+    const future = { ...workspace(), version: BOARD_SCHEMA_VERSION + 1 };
+    const original = JSON.stringify(future);
+    values.set(BOARD_STORAGE_KEY, original);
+
+    const loaded = loadWorkspace();
+
+    assert.equal(loaded.activeBoardId, "board-1");
+    assert.equal(values.get(BOARD_STORAGE_KEY), original);
+    assert.equal(values.get(BOARD_BACKUP_STORAGE_KEY), original);
   });
 });
