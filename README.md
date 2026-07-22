@@ -125,7 +125,9 @@ index.html
     │   ├── board.permissions.js  Zentrale Berechtigungsregeln
     │   ├── board.demo-data.js    Mitgelieferte Showcase-Boards
     │   └── board.dom.js          Gezielte DOM-Aktualisierungen
-    ├── templates/board.map.js    Deklarative UI-Beschreibungen
+    ├── templates/
+    │   ├── board.map.js          Stabile öffentliche Template-Exports
+    │   └── board/                Seite, Kanban, Dialoge und Konfiguration
     ├── features/                 Filter, Feedback und Einstellungen
     └── styles/style.css          Responsive Light-/Dark-Styles
 ```
