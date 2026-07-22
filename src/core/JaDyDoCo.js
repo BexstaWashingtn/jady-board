@@ -66,7 +66,6 @@
  *   attrs: {},
  *   class: "",
  *   text: "",
- *   html: "",
  *   dataset: {},
  *   style: {},
  *   events: {},
@@ -80,7 +79,6 @@
  * tagName
  * children
  * text
- * html
  * events
  * attrs
  * dataset
@@ -133,7 +131,6 @@
  * @property {boolean} [hidden] Whether the element is hidden.
  * @property {ClassValue} [class] One or more CSS classes.
  * @property {string | number | boolean} [text] Safe text rendered with textContent.
- * @property {string} [html] Trusted HTML rendered with innerHTML.
  * @property {DatasetMap} [dataset] Values exposed as data-* attributes.
  * @property {StyleMap} [style] Inline styles using DOM style property names.
  * @property {EventMap} [events] Native event names mapped to listener functions.
@@ -597,28 +594,22 @@ export class JaDyDoCo {
   }
 
   /**
-   * Applies text or HTML content to a DOM element.
+   * Applies safe plain-text content to a DOM element.
    *
    * text:
    * Uses textContent for safe plain text rendering.
-   *
-   * html:
-   * Uses innerHTML for direct HTML rendering.
-   *
-   * Note:
-   * text and html should not be used together.
    *
    * @param {HTMLElement} element
    * @param {JaDyNode} node
    */
 
   applyContent(element, node) {
-    if (node.text !== undefined) {
-      element.textContent = String(node.text);
+    if ("html" in node) {
+      throw new Error("JaDyDoCo: raw HTML content is not supported; use text or children.");
     }
 
-    if (node.html !== undefined) {
-      element.innerHTML = String(node.html);
+    if (node.text !== undefined) {
+      element.textContent = String(node.text);
     }
   }
 

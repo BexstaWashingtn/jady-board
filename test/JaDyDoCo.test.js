@@ -265,13 +265,13 @@ describe("Inhalt, Events und Select-Optionen", () => {
     assert.equal(element.textContent, "false");
   });
 
-  test("applyContent interpretiert html und html überschreibt text", () => {
+  test("applyContent weist unsicheres Raw-HTML zurück", () => {
     const element = document.createElement("div");
-    new JaDyDoCo().applyContent(element, {
-      text: "Text",
-      html: "<strong>HTML</strong>",
-    });
-    assert.equal(element.innerHTML, "<strong>HTML</strong>");
+    assert.throws(
+      () => new JaDyDoCo().applyContent(element, /** @type {any} */ ({ html: "<strong>HTML</strong>" })),
+      /raw HTML content is not supported/,
+    );
+    assert.equal(element.textContent, "");
   });
 
   test("applyEvents registriert nur Funktionen", () => {

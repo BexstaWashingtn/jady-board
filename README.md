@@ -106,9 +106,16 @@ npm run typecheck
 
 # Tests mit Node.js-Coverage-Bericht
 npm run test:coverage
+
+# Browser-Smoke-Tests mit Playwright
+npx playwright install chromium firefox webkit
+npm run test:e2e
+
+# Browser-Smoke-Tests sichtbar ausführen
+npm run test:e2e:headed
 ```
 
-Die Tests decken unter anderem Rendering, State-Operationen, Filter, Persistenz, Berechtigungen, Stages, WIP-Limits, Übergangsregeln, Todos, Fälligkeiten und Undo-Kommandos ab.
+Die Tests decken unter anderem Rendering, State-Operationen, Filter, Persistenz, Berechtigungen, Stages, WIP-Limits, Übergangsregeln, Todos, Fälligkeiten und Undo-Kommandos ab. Die Playwright-Suite prüft zusätzlich in Chromium, Firefox und WebKit den echten Browserstart, das Erstellen und Persistieren einer Aufgabe, Drag-and-drop sowie die Tastaturbedienung eines Dialogs.
 
 ## Technische Architektur
 
