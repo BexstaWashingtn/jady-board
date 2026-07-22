@@ -1,0 +1,15 @@
+{
+  "name": "jadydo-core",
+  "version": "2.0.0-alpha.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test",
+    "test:coverage": "node --test --experimental-test-coverage",
+    "typecheck": "tsc --project jsconfig.json"
+  },
+  "devDependencies": {
+    "jsdom": "^26.1.0",
+    "typescript": "^7.0.2"
+  }
+}
