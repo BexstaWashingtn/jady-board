@@ -49,7 +49,7 @@ afterEach(() => {
 });
 
 function startController() {
-  createBoardController(createApp("#root"));
+  return createBoardController(createApp("#root"));
 }
 
 function findButton(label) {
@@ -131,5 +131,36 @@ describe("Board-Controller-Integration", () => {
     const saved = JSON.parse(localStorage.getItem(BOARD_STORAGE_KEY));
     assert.equal(saved.boards["board-1"].project.name, "Delivery Board");
     assert.equal(saved.boards["board-1"].project.description, "Release-Steuerung");
+  });
+
+  test("warnt dauerhaft bei einem Speicherfehler und erlaubt einen erneuten Versuch", () => {
+    const controller = startController();
+    const workingStorage = localStorage;
+    globalThis.localStorage = {
+      getItem: workingStorage.getItem.bind(workingStorage),
+      removeItem: workingStorage.removeItem.bind(workingStorage),
+      setItem() { throw new DOMException("Quota exceeded", "QuotaExceededError"); },
+    };
+
+    findButton("+ Neue Aufgabe").click();
+    const form = document.querySelector(".task-form");
+    assert.ok(form instanceof HTMLFormElement);
+    form.elements.namedItem("title").value = "Ungespeicherte Aufgabe";
+    form.elements.namedItem("category").value = "QA";
+    form.elements.namedItem("priority").value = "medium";
+    form.elements.namedItem("assignee").value = "TB";
+    submit(form);
+
+    const task = Object.values(controller.getState().tasks)
+      .find((candidate) => candidate.title === "Ungespeicherte Aufgabe");
+    assert.ok(task);
+    assert.match(document.querySelector(".persistence-warning")?.textContent ?? "", /nur vorübergehend gespeichert/);
+
+    globalThis.localStorage = workingStorage;
+    findButton("Erneut speichern").click();
+
+    assert.equal(document.querySelector(".persistence-warning"), null);
+    const saved = JSON.parse(localStorage.getItem(BOARD_STORAGE_KEY));
+    assert.equal(saved.boards["board-1"].tasks[task.id].title, "Ungespeicherte Aufgabe");
   });
 });

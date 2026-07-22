@@ -59,13 +59,14 @@ import { createAppSettings } from "../features/settings/app-settings.map.js";
  * @property {EventListener} createUser
  * @property {() => void} deleteUser
  * @property {(theme: string) => void} setTheme
+ * @property {() => void} retryPersistence
  */
 
 /**
  * @param {import("../board/board.state.js").BoardState} state
  * @param {import("../board/board.view-state.js").BoardViewState} viewState
  * @param {BoardActions} actions
- * @param {{ activeBoardId: string, boards: Array<{id: string, name: string}>, createOpen: boolean, userSettingsOpen: boolean, appSettingsOpen: boolean, activeUserId: string, users: Array<{id: string, name: string, initials: string, preferences: {theme: string}}> }} workspace
+ * @param {{ activeBoardId: string, boards: Array<{id: string, name: string}>, createOpen: boolean, userSettingsOpen: boolean, appSettingsOpen: boolean, activeUserId: string, users: Array<{id: string, name: string, initials: string, preferences: {theme: string}}>, persistenceError: boolean }} workspace
  * @returns {import("../core/JaDyDoCo.js").JaDyNode}
  */
 export function createBoardPage(state, viewState, actions, workspace) {
@@ -194,6 +195,7 @@ export function createBoardPage(state, viewState, actions, workspace) {
           id: "board",
           class: "board-main",
           children: [
+            ...(workspace.persistenceError ? [createPersistenceWarning(actions)] : []),
             {
               tagName: "header",
               class: "board-header",
@@ -268,6 +270,28 @@ export function createBoardPage(state, viewState, actions, workspace) {
     ...(workspace.userSettingsOpen ? [createUserSettings(workspace, actions)] : []),
     ...(workspace.appSettingsOpen ? [createAppSettings(workspace, actions)] : []),
   ],
+  };
+}
+
+/** @param {BoardActions} actions @returns {import("../core/JaDyDoCo.js").JaDyNode} */
+function createPersistenceWarning(actions) {
+  return {
+    tagName: "aside",
+    class: "persistence-warning",
+    attrs: { role: "alert" },
+    children: [
+      {
+        tagName: "span",
+        text: "Änderungen sind nur vorübergehend gespeichert. Der Browserspeicher ist derzeit nicht verfügbar.",
+      },
+      {
+        tagName: "button",
+        type: "button",
+        class: "button button--secondary",
+        text: "Erneut speichern",
+        events: { click: actions.retryPersistence },
+      },
+    ],
   };
 }
 

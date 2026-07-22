@@ -30,6 +30,7 @@ import { createBoardViewState } from "./board.view-state.js";
 export function createBoardController(app) {
   let workspace = loadWorkspace();
   if (ensureShowcaseData(workspace)) persistWorkspace(workspace);
+  let persistenceError = false;
   let state = workspace.boards[workspace.activeBoardId];
   /** @type {Record<string, import("./board.view-state.js").BoardViewState>} */
   const boardViewStates = {};
@@ -47,6 +48,10 @@ export function createBoardController(app) {
   let undoTimer = null;
 
   const actions = {
+    retryPersistence() {
+      saveState(state);
+      render();
+    },
     openAppSettings() { appSettingsOpen = true; render(); },
     closeAppSettings() { appSettingsOpen = false; render(); },
     openUserSettings() { userSettingsOpen = true; render(); },
@@ -628,6 +633,7 @@ export function createBoardController(app) {
       appSettingsOpen,
       activeUserId: workspace.activeUserId,
       users: Object.values(workspace.users),
+      persistenceError,
     }));
   }
 
@@ -707,7 +713,7 @@ export function createBoardController(app) {
   /** @param {import("./board.state.js").BoardState} _state */
   function saveState(_state) {
     workspace.boards[workspace.activeBoardId] = state;
-    persistWorkspace(workspace);
+    persistenceError = !persistWorkspace(workspace);
   }
 
   function applyUserTheme() {
