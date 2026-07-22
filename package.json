@@ -1,14 +1,17 @@
 {
-  "name": "jadydo-board",
-  "version": "0.9",
+  "name": "jady-board",
+  "version": "0.9.0",
   "private": true,
   "type": "module",
   "scripts": {
     "test": "node --test",
+    "test:e2e": "playwright test",
+    "test:e2e:headed": "playwright test --headed",
     "test:coverage": "node --test --experimental-test-coverage",
     "typecheck": "tsc --project jsconfig.json"
   },
   "devDependencies": {
+    "@playwright/test": "^1.61.1",
     "jsdom": "^26.1.0",
     "typescript": "^7.0.2"
   }
