@@ -73,9 +73,9 @@ export function createBoardActions(context) {
       state.project.memberIds = [...new Set([...data.getAll("memberIds").map(String), state.project.ownerId])].filter((id) => validUserIds.has(id));
       const boardMembers = new Set(state.project.memberIds);
       Object.values(state.tasks).forEach((task) => {
-        if (task.ownerId && !boardMembers.has(task.ownerId)) task.ownerId = null;
-        task.memberIds = task.memberIds.filter((id) => boardMembers.has(id));
+        if (task.assigneeId && !boardMembers.has(task.assigneeId)) task.assigneeId = null;
       });
+      context.viewState().boardConfigOpen = false;
       context.saveState();
       context.render();
     },

@@ -4,7 +4,7 @@ import { syncFilterControls, updateClearFilterButton, updateFilterOptionCounts }
 /** @param {import("./action-context.js").BoardActionContext} context */
 export function createFilterActions(context) {
   return {
-    /** @param {"query" | "priority" | "category" | "assignee"} key @param {string} value */
+    /** @param {"query" | "priority" | "category" | "assigneeId"} key @param {string} value */
     setFilter(key, value) {
       const viewState = context.viewState();
       viewState.filters[key] = value;

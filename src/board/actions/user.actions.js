@@ -70,8 +70,7 @@ export function createUserActions(context) {
       Object.values(workspace.boards).forEach((board) => {
         board.project.memberIds = board.project.memberIds.filter((id) => id !== user.id);
         Object.values(board.tasks).forEach((task) => {
-          if (task.ownerId === user.id) task.ownerId = null;
-          task.memberIds = task.memberIds.filter((id) => id !== user.id);
+          if (task.assigneeId === user.id) task.assigneeId = null;
         });
       });
       delete workspace.users[workspace.activeUserId];

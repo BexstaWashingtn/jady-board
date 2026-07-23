@@ -34,11 +34,11 @@ function createLaunchShowcase(ownerId) {
     demoColumn("live", "Live", "#57b894", "done", null, "warning", ["planning"], true, ["LAUNCH-05"]),
   ];
   board.tasks = {
-    "LAUNCH-01": demoTask("LAUNCH-01", "Launch-Kampagne konzipieren", "Marketing", "medium", ownerId, ["user-demo-mara"], relativeDate(10), [["Zielgruppe definieren", true], ["Kanäle priorisieren", false], ["Budget abstimmen", false]]),
-    "LAUNCH-02": demoTask("LAUNCH-02", "Pricing-Seite finalisieren", "Frontend", "high", "user-demo-mara", [ownerId], relativeDate(0), [["Responsive Layout", true], ["Tracking Events", false], ["Copy einpflegen", true], ["QA durchführen", false]]),
-    "LAUNCH-03": demoTask("LAUNCH-03", "Release Notes vorbereiten", "Docs", "low", "user-demo-lukas", [], relativeDate(3), [["Features sammeln", true], ["Screenshots ergänzen", false]]),
-    "LAUNCH-04": demoTask("LAUNCH-04", "Checkout End-to-End prüfen", "QA", "high", ownerId, ["user-demo-mara", "user-demo-lukas"], relativeDate(-1), [["Desktop geprüft", true], ["Mobile geprüft", false], ["Zahlung geprüft", true]]),
-    "LAUNCH-05": demoTask("LAUNCH-05", "Design-System veröffentlicht", "Design", "medium", "user-demo-mara", [ownerId], relativeDate(-5), [["Tokens dokumentiert", true], ["Komponenten freigegeben", true]]),
+    "LAUNCH-01": demoTask("LAUNCH-01", "Launch-Kampagne konzipieren", "Marketing", "medium", ownerId, relativeDate(10), [["Zielgruppe definieren", true], ["Kanäle priorisieren", false], ["Budget abstimmen", false]]),
+    "LAUNCH-02": demoTask("LAUNCH-02", "Pricing-Seite finalisieren", "Frontend", "high", "user-demo-mara", relativeDate(0), [["Responsive Layout", true], ["Tracking Events", false], ["Copy einpflegen", true], ["QA durchführen", false]]),
+    "LAUNCH-03": demoTask("LAUNCH-03", "Release Notes vorbereiten", "Docs", "low", "user-demo-lukas", relativeDate(3), [["Features sammeln", true], ["Screenshots ergänzen", false]]),
+    "LAUNCH-04": demoTask("LAUNCH-04", "Checkout End-to-End prüfen", "QA", "high", ownerId, relativeDate(-1), [["Desktop geprüft", true], ["Mobile geprüft", false], ["Zahlung geprüft", true]]),
+    "LAUNCH-05": demoTask("LAUNCH-05", "Design-System veröffentlicht", "Design", "medium", "user-demo-mara", relativeDate(-5), [["Tokens dokumentiert", true], ["Komponenten freigegeben", true]]),
   };
   return board;
 }
@@ -55,11 +55,11 @@ function createSupportShowcase(ownerId) {
     demoColumn("closed", "Geschlossen", "#57b894", "done", null, "warning", ["triage"], true, ["SUP-19"]),
   ];
   board.tasks = {
-    "SUP-31": demoTask("SUP-31", "Login nach Passwortwechsel blockiert", "Incident", "high", "user-demo-lukas", [ownerId], relativeDate(0), [["Logs sichern", false], ["Kunden informieren", false]]),
-    "SUP-32": demoTask("SUP-32", "Export enthält falsche Zeitzone", "Bug", "medium", null, ["user-demo-mara"], relativeDate(7), []),
-    "SUP-28": demoTask("SUP-28", "Webhook-Ausfälle analysieren", "Platform", "high", "user-demo-mara", ["user-demo-lukas"], relativeDate(2), [["Monitoring prüfen", true], ["Retries auswerten", false]]),
-    "SUP-24": demoTask("SUP-24", "CSV-Encoding korrigieren", "Bug", "medium", ownerId, ["user-demo-mara"], relativeDate(-2), [["Fix implementieren", true], ["Regressionstest", false]]),
-    "SUP-19": demoTask("SUP-19", "Hilfecenter aktualisieren", "Docs", "low", "user-demo-lukas", [], relativeDate(-8), [["Artikel schreiben", true], ["Review abschließen", true]]),
+    "SUP-31": demoTask("SUP-31", "Login nach Passwortwechsel blockiert", "Incident", "high", "user-demo-lukas", relativeDate(0), [["Logs sichern", false], ["Kunden informieren", false]]),
+    "SUP-32": demoTask("SUP-32", "Export enthält falsche Zeitzone", "Bug", "medium", null, relativeDate(7), []),
+    "SUP-28": demoTask("SUP-28", "Webhook-Ausfälle analysieren", "Platform", "high", "user-demo-mara", relativeDate(2), [["Monitoring prüfen", true], ["Retries auswerten", false]]),
+    "SUP-24": demoTask("SUP-24", "CSV-Encoding korrigieren", "Bug", "medium", ownerId, relativeDate(-2), [["Fix implementieren", true], ["Regressionstest", false]]),
+    "SUP-19": demoTask("SUP-19", "Hilfecenter aktualisieren", "Docs", "low", "user-demo-lukas", relativeDate(-8), [["Artikel schreiben", true], ["Review abschließen", true]]),
   };
   return board;
 }
@@ -69,9 +69,9 @@ function demoColumn(id, title, color, kind, limit, limitMode, allowedTargetIds, 
   return { id, title, color, kind, limit, limitMode, allowedTargetIds, requireCompletedTodos, taskIds };
 }
 
-/** @param {string} id @param {string} title @param {string} category @param {"low"|"medium"|"high"} priority @param {string|null} ownerId @param {string[]} memberIds @param {string} dueDate @param {Array<[string, boolean]>} todos */
-function demoTask(id, title, category, priority, ownerId, memberIds, dueDate, todos) {
-  return { id, title, category, priority, assignee: "TB", comments: todos.length, dueDate, ownerId, memberIds, todos: todos.map(([text, completed], index) => ({ id: `todo-${index + 1}`, text, completed })) };
+/** @param {string} id @param {string} title @param {string} category @param {"low"|"medium"|"high"} priority @param {string|null} assigneeId @param {string} dueDate @param {Array<[string, boolean]>} todos */
+function demoTask(id, title, category, priority, assigneeId, dueDate, todos) {
+  return { id, title, category, priority, comments: todos.length, dueDate, assigneeId, todos: todos.map(([text, completed], index) => ({ id: `todo-${index + 1}`, text, completed })) };
 }
 
 /** @param {number} offsetDays */

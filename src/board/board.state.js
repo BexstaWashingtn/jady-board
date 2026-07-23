@@ -1,17 +1,17 @@
 /** @typedef {{ id: string, text: string, completed: boolean }} TaskTodo */
-/** @typedef {{ id: string, title: string, category: string, priority: "low" | "medium" | "high", assignee: string, comments: number, todos: TaskTodo[], dueDate: string | null, ownerId: string | null, memberIds: string[] }} BoardTask */
+/** @typedef {{ id: string, title: string, category: string, priority: "low" | "medium" | "high", comments: number, todos: TaskTodo[], dueDate: string | null, assigneeId: string | null }} BoardTask */
 /** @typedef {"backlog" | "active" | "review" | "done"} ColumnKind */
 /** @typedef {"warning" | "strict"} LimitMode */
 /** @typedef {{ id: string, title: string, color: string, kind: ColumnKind, limit: number | null, limitMode: LimitMode, allowedTargetIds: string[] | null, requireCompletedTodos: boolean, taskIds: string[] }} BoardColumn */
 /** @typedef {{ name: string, path: string, description: string, ownerId: string, memberIds: string[] }} BoardProject */
-/** @typedef {{ query: string, priority: string, category: string, assignee: string }} BoardFilters */
+/** @typedef {{ query: string, priority: string, category: string, assigneeId: string }} BoardFilters */
 /** @typedef {{ type: "move-task", taskId: string, columnId: string, index: number } | { type: "delete-task", task: BoardTask, columnId: string, index: number }} UndoCommand */
 /** @typedef {{ project: BoardProject, columns: BoardColumn[], tasks: Record<string, BoardTask> }} BoardState */
-/** @typedef {{ title: unknown, category: unknown, priority: unknown, assignee: unknown, dueDate?: unknown, columnId: string }} NewTaskInput */
+/** @typedef {{ title: unknown, category: unknown, priority: unknown, assigneeId?: unknown, dueDate?: unknown, columnId: string }} NewTaskInput */
 
 export const BOARD_STORAGE_KEY = "jadydoco.board";
 export const LEGACY_BOARD_STORAGE_KEY = "jadydoco.board.v1";
-export const BOARD_SCHEMA_VERSION = 4;
+export const BOARD_SCHEMA_VERSION = 5;
 
 /** @type {BoardState} */
 export const initialBoardState = {
@@ -29,15 +29,15 @@ export const initialBoardState = {
     { id: "done", title: "Erledigt", color: "#57b894", kind: "done", limit: null, limitMode: "warning", allowedTargetIds: null, requireCompletedTodos: false, taskIds: ["KAN-05", "KAN-07"] },
   ],
   tasks: {
-    "KAN-18": task("KAN-18", "Leere Zustände für alle Ansichten gestalten", "Design", "medium", "MK", 2),
-    "KAN-21": task("KAN-21", "Komponenten-API evaluieren", "Research", "low", "TB", 0),
-    "KAN-24": task("KAN-24", "Keyboard-Navigation dokumentieren", "Docs", "medium", "LS", 1),
-    "KAN-12": task("KAN-12", "Atomisches Rendering mit Fragmenten", "Core", "high", "TB", 4),
-    "KAN-16": task("KAN-16", "Responsive Board-Navigation", "Frontend", "medium", "MK", 2),
-    "KAN-09": task("KAN-09", "JSDoc-Typen für Nodes ergänzen", "Types", "high", "TB", 5),
-    "KAN-14": task("KAN-14", "Formular-Beispiele überprüfen", "QA", "medium", "LS", 0),
-    "KAN-05": task("KAN-05", "Automatisierte Core-Tests", "Testing", "high", "TB", 8),
-    "KAN-07": task("KAN-07", "Projektstruktur modernisieren", "Core", "medium", "MK", 0),
+    "KAN-18": task("KAN-18", "Leere Zustände für alle Ansichten gestalten", "Design", "medium", null, 2),
+    "KAN-21": task("KAN-21", "Komponenten-API evaluieren", "Research", "low", "user-1", 0),
+    "KAN-24": task("KAN-24", "Keyboard-Navigation dokumentieren", "Docs", "medium", null, 1),
+    "KAN-12": task("KAN-12", "Atomisches Rendering mit Fragmenten", "Core", "high", "user-1", 4),
+    "KAN-16": task("KAN-16", "Responsive Board-Navigation", "Frontend", "medium", null, 2),
+    "KAN-09": task("KAN-09", "JSDoc-Typen für Nodes ergänzen", "Types", "high", "user-1", 5),
+    "KAN-14": task("KAN-14", "Formular-Beispiele überprüfen", "QA", "medium", null, 0),
+    "KAN-05": task("KAN-05", "Automatisierte Core-Tests", "Testing", "high", "user-1", 8),
+    "KAN-07": task("KAN-07", "Projektstruktur modernisieren", "Core", "medium", null, 0),
   },
 };
 
@@ -65,7 +65,7 @@ export function addTask(state, input) {
     title,
     String(input.category || "Allgemein"),
     normalizePriority(input.priority),
-    String(input.assignee || "TB").toUpperCase().slice(0, 2),
+    typeof input.assigneeId === "string" && input.assigneeId ? input.assigneeId : null,
     0,
     normalizeDueDate(input.dueDate),
   );
@@ -108,7 +108,7 @@ export function moveTask(state, taskId, targetColumnId, targetIndex) {
 /**
  * @param {BoardState} state
  * @param {string} taskId
- * @param {{ title?: unknown, category?: unknown, priority?: unknown, assignee?: unknown, dueDate?: unknown }} changes
+ * @param {{ title?: unknown, category?: unknown, priority?: unknown, assigneeId?: unknown, dueDate?: unknown }} changes
  * @returns {BoardTask}
  */
 export function updateTask(state, taskId, changes) {
@@ -125,8 +125,8 @@ export function updateTask(state, taskId, changes) {
   if (changes.priority !== undefined) {
     current.priority = normalizePriority(changes.priority);
   }
-  if (changes.assignee !== undefined) {
-    current.assignee = String(changes.assignee).trim().toUpperCase().slice(0, 2) || "TB";
+  if (changes.assigneeId !== undefined) {
+    current.assigneeId = typeof changes.assigneeId === "string" && changes.assigneeId ? changes.assigneeId : null;
   }
   if (changes.dueDate !== undefined) current.dueDate = normalizeDueDate(changes.dueDate);
   return current;
@@ -197,7 +197,7 @@ export function deleteTask(state, taskId) {
 
 /** @returns {BoardFilters} */
 export function createEmptyFilters() {
-  return { query: "", priority: "all", category: "all", assignee: "all" };
+  return { query: "", priority: "all", category: "all", assigneeId: "all" };
 }
 
 /**
@@ -206,13 +206,13 @@ export function createEmptyFilters() {
  */
 export function matchesTaskFilters(task, filters) {
   const query = filters.query.trim().toLowerCase();
-  const searchable = `${task.id} ${task.title} ${task.category} ${task.assignee}`.toLowerCase();
+  const searchable = `${task.id} ${task.title} ${task.category}`.toLowerCase();
 
   return (
     (!query || searchable.includes(query)) &&
     (filters.priority === "all" || task.priority === filters.priority) &&
     (filters.category === "all" || task.category === filters.category) &&
-    (filters.assignee === "all" || task.assignee === filters.assignee)
+    (filters.assigneeId === "all" || (filters.assigneeId === "" ? !task.assigneeId : task.assigneeId === filters.assigneeId))
   );
 }
 
@@ -222,7 +222,7 @@ export function hasActiveFilters(filters) {
     filters.query.trim() ||
       filters.priority !== "all" ||
       filters.category !== "all" ||
-      filters.assignee !== "all",
+      filters.assigneeId !== "all",
   );
 }
 
@@ -232,7 +232,7 @@ export function countActiveFilters(filters) {
     filters.query.trim() !== "",
     filters.priority !== "all",
     filters.category !== "all",
-    filters.assignee !== "all",
+    filters.assigneeId !== "all",
   ].filter(Boolean).length;
 }
 
@@ -241,7 +241,7 @@ export function countActiveFilters(filters) {
  * that dimension's current selection. All other active filters remain active.
  *
  * @param {BoardState} state
- * @param {"priority" | "category" | "assignee"} facet
+ * @param {"priority" | "category" | "assigneeId"} facet
  * @returns {Record<string, number>}
  */
 export function countTasksByFacet(state, facet, activeFilters = createEmptyFilters()) {
@@ -253,7 +253,7 @@ export function countTasksByFacet(state, facet, activeFilters = createEmptyFilte
   const counts = { all: matching.length };
 
   matching.forEach((task) => {
-    const value = task[facet];
+    const value = task[facet] ?? "";
     counts[value] = (counts[value] ?? 0) + 1;
   });
   return counts;
@@ -465,13 +465,13 @@ function nextColumnId(columns) {
  * @param {string} title
  * @param {string} category
  * @param {"low" | "medium" | "high"} priority
- * @param {string} assignee
+ * @param {string|null} assigneeId
  * @param {number} comments
  * @param {string | null} [dueDate]
  * @returns {BoardTask}
  */
-function task(id, title, category, priority, assignee, comments, dueDate = null) {
-  return { id, title, category, priority, assignee, comments, todos: [], dueDate, ownerId: null, memberIds: [] };
+function task(id, title, category, priority, assigneeId, comments, dueDate = null) {
+  return { id, title, category, priority, comments, todos: [], dueDate, assigneeId };
 }
 
 /** @param {unknown} value */

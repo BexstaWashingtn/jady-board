@@ -170,12 +170,12 @@ function normalizeTask(id, value) {
     title,
     category: nonEmptyString(value.category, "Allgemein"),
     priority: /** @type {"low" | "medium" | "high"} */ (priority),
-    assignee: nonEmptyString(value.assignee, "TB").toUpperCase().slice(0, 2),
     comments: Number.isInteger(value.comments) && Number(value.comments) >= 0 ? Number(value.comments) : 0,
     todos,
     dueDate: validDate(value.dueDate) ? String(value.dueDate) : null,
-    ownerId: typeof value.ownerId === "string" ? value.ownerId : null,
-    memberIds: stringArray(value.memberIds),
+    assigneeId: typeof value.assigneeId === "string"
+      ? value.assigneeId
+      : typeof value.ownerId === "string" ? value.ownerId : null,
   };
 }
 
@@ -208,8 +208,7 @@ function repairUserReferences(board, users, fallbackUserId) {
   board.project.memberIds = [...new Set([...board.project.memberIds.filter((id) => users[id]), ownerId])];
   const members = new Set(board.project.memberIds);
   Object.values(board.tasks).forEach((task) => {
-    if (task.ownerId && !members.has(task.ownerId)) task.ownerId = null;
-    task.memberIds = [...new Set(task.memberIds.filter((id) => members.has(id) && id !== task.ownerId))];
+    if (task.assigneeId && !members.has(task.assigneeId)) task.assigneeId = null;
   });
 }
 

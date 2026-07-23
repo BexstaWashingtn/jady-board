@@ -11,7 +11,7 @@ test("Domain-State und flüchtiger Board-View-State sind getrennt", () => {
   assert.equal("ui" in state, false);
   assert.equal(viewState.createTaskColumnId, "backlog");
   assert.deepEqual(viewState.filters, {
-    query: "", priority: "all", category: "all", assignee: "all",
+    query: "", priority: "all", category: "all", assigneeId: "all",
   });
 
   viewState.selectedTaskId = "KAN-18";

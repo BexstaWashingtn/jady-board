@@ -95,8 +95,7 @@ describe("Board-Persistenz", () => {
     damaged.boards["board-1"].project.memberIds = ["missing-user", "user-1"];
     damaged.boards["board-1"].columns[0].taskIds = ["KAN-18", "KAN-18", "missing-task"];
     damaged.boards["board-1"].columns[1].taskIds.push("KAN-18");
-    damaged.boards["board-1"].tasks["KAN-21"].ownerId = "missing-user";
-    damaged.boards["board-1"].tasks["KAN-21"].memberIds = ["missing-user", "user-1", "user-1"];
+    damaged.boards["board-1"].tasks["KAN-21"].assigneeId = "missing-user";
     const original = JSON.stringify(damaged);
     values.set(BOARD_STORAGE_KEY, original);
 
@@ -110,8 +109,7 @@ describe("Board-Persistenz", () => {
     assert.deepEqual(board.project.memberIds, ["user-1"]);
     assert.equal(occurrences, 1);
     assert.equal(board.columns.some(({ taskIds }) => taskIds.includes("missing-task")), false);
-    assert.equal(board.tasks["KAN-21"].ownerId, null);
-    assert.deepEqual(board.tasks["KAN-21"].memberIds, ["user-1"]);
+    assert.equal(board.tasks["KAN-21"].assigneeId, null);
     assert.equal(values.get(BOARD_BACKUP_STORAGE_KEY), original);
     assert.equal(JSON.parse(values.get(BOARD_STORAGE_KEY)).version, BOARD_SCHEMA_VERSION);
   });

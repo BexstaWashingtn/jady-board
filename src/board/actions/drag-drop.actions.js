@@ -1,11 +1,13 @@
 import { canAcceptTasks, canMoveTaskTo, createMoveUndo, moveTask } from "../board.state.js";
 import { clearDropTargets, updateDropPosition } from "../board.dom.js";
+import { canWorkOnTask } from "../board.permissions.js";
 
 /** @param {import("./action-context.js").BoardActionContext} context */
 export function createDragDropActions(context) {
   return {
     /** @param {DragEvent} event @param {string} taskId */
     startTaskDrag(event, taskId) {
+      if (!canWorkOnTask(context.state(), taskId, context.workspace.activeUserId)) return;
       context.viewState().draggingTaskId = taskId;
       event.dataTransfer?.setData("text/plain", taskId);
       if (event.dataTransfer) event.dataTransfer.effectAllowed = "move";
@@ -54,6 +56,7 @@ export function createDragDropActions(context) {
       const targetIndex = Number(column?.dataset.dropIndex);
       clearDropTargets();
       if (!taskId || !state.tasks[taskId]) return;
+      if (!canWorkOnTask(state, taskId, context.workspace.activeUserId)) return;
       if (!canMoveTaskTo(state, taskId, columnId)) { context.registerNotice(context.moveRejectionMessage(taskId, columnId)); return; }
       if (!canAcceptTasks(state, columnId, 1, taskId)) return;
       const undo = createMoveUndo(state, taskId);

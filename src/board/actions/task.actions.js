@@ -3,6 +3,10 @@ import {
   createDeleteUndo, createInitialBoardState, createMoveUndo,
   deleteTask as removeTask, deleteTaskTodo, moveTask, updateTask, updateTaskTodo,
 } from "../board.state.js";
+import {
+  canAssignTask, canClaimTask, canCreateTask, canDeleteTask, canEditTask,
+  canReleaseTask, canViewTask, canWorkOnTask,
+} from "../board.permissions.js";
 import { createBoardViewState } from "../board.view-state.js";
 
 /** @param {import("./action-context.js").BoardActionContext} context */
@@ -11,6 +15,7 @@ export function createTaskActions(context) {
     /** @param {string} [columnId] */
     openCreateTask(columnId) {
       const state = context.state();
+      if (!canCreateTask(state, context.workspace.activeUserId)) return;
       const requestedColumn = state.columns.find((column) => column.id === columnId);
       const requested = requestedColumn && canAcceptTasks(state, requestedColumn.id)
         ? requestedColumn.id
@@ -28,13 +33,23 @@ export function createTaskActions(context) {
     /** @param {string} taskId */
     openTask(taskId) {
       if (Date.now() < context.interaction.taskOpenUntil) return;
+      if (!canViewTask(context.state(), taskId, context.workspace.activeUserId)) return;
       context.viewState().selectedTaskId = taskId;
+      context.viewState().taskEditOpen = false;
       context.render();
     },
-    closeTask() { context.viewState().selectedTaskId = null; context.render(); },
+    closeTask() { context.viewState().selectedTaskId = null; context.viewState().taskEditOpen = false; context.render(); },
+    /** @param {string} taskId */
+    openTaskEditor(taskId) {
+      if (!canEditTask(context.state(), taskId, context.workspace.activeUserId)) return;
+      context.viewState().taskEditOpen = true;
+      context.render();
+    },
+    closeTaskEditor() { context.viewState().taskEditOpen = false; context.render(); },
 
     /** @param {string} taskId */
     addTodo(taskId) {
+      if (!canWorkOnTask(context.state(), taskId, context.workspace.activeUserId)) return;
       const input = document.querySelector("#new-todo");
       if (!(input instanceof HTMLInputElement)) return;
       addTaskTodo(context.state(), taskId, input.value);
@@ -46,11 +61,11 @@ export function createTaskActions(context) {
       });
     },
     /** @param {string} taskId @param {string} todoId @param {boolean} completed */
-    toggleTodo(taskId, todoId, completed) { updateTaskTodo(context.state(), taskId, todoId, { completed }); context.saveState(); context.render(); },
+    toggleTodo(taskId, todoId, completed) { if (!canWorkOnTask(context.state(), taskId, context.workspace.activeUserId)) return; updateTaskTodo(context.state(), taskId, todoId, { completed }); context.saveState(); context.render(); },
     /** @param {string} taskId @param {string} todoId @param {string} text */
-    updateTodo(taskId, todoId, text) { updateTaskTodo(context.state(), taskId, todoId, { text }); context.saveState(); },
+    updateTodo(taskId, todoId, text) { if (!canWorkOnTask(context.state(), taskId, context.workspace.activeUserId)) return; updateTaskTodo(context.state(), taskId, todoId, { text }); context.saveState(); },
     /** @param {string} taskId @param {string} todoId */
-    deleteTodo(taskId, todoId) { deleteTaskTodo(context.state(), taskId, todoId); context.saveState(); context.render(); },
+    deleteTodo(taskId, todoId) { if (!canWorkOnTask(context.state(), taskId, context.workspace.activeUserId)) return; deleteTaskTodo(context.state(), taskId, todoId); context.saveState(); context.render(); },
 
     undoLastAction() {
       const viewState = context.viewState();
@@ -68,8 +83,13 @@ export function createTaskActions(context) {
     submitCreateTask(event) {
       event.preventDefault();
       if (!(event.currentTarget instanceof HTMLFormElement)) return;
+      if (!canCreateTask(context.state(), context.workspace.activeUserId)) return;
       const data = new FormData(event.currentTarget);
-      addTask(context.state(), { title: data.get("title"), category: data.get("category"), priority: data.get("priority"), assignee: data.get("assignee"), dueDate: data.get("dueDate"), columnId: String(data.get("columnId") ?? "backlog") });
+      const state = context.state();
+      const assigneeId = String(data.get("assigneeId") ?? "");
+      const userId = context.workspace.activeUserId;
+      const canSelectAssignee = context.isBoardOwner() || assigneeId === userId;
+      addTask(state, { title: data.get("title"), category: data.get("category"), priority: data.get("priority"), assigneeId: canSelectAssignee && state.project.memberIds.includes(assigneeId) ? assigneeId : null, dueDate: data.get("dueDate"), columnId: String(data.get("columnId") ?? "backlog") });
       context.viewState().createTaskOpen = false;
       context.saveState();
       context.render();
@@ -92,6 +112,21 @@ export function createTaskActions(context) {
       const data = new FormData(event.currentTarget);
       const state = context.state();
       const taskId = String(data.get("taskId") ?? "");
+      if (!canEditTask(state, taskId, context.workspace.activeUserId)) return;
+      updateTask(state, taskId, { title: data.get("title"), category: data.get("category"), priority: data.get("priority"), dueDate: data.get("dueDate") });
+      context.viewState().taskEditOpen = false;
+      context.saveState();
+      context.render();
+    },
+
+    /** @param {Event} event */
+    submitTaskWork(event) {
+      event.preventDefault();
+      if (!(event.currentTarget instanceof HTMLFormElement)) return;
+      const data = new FormData(event.currentTarget);
+      const state = context.state();
+      const taskId = String(data.get("taskId") ?? "");
+      if (!canWorkOnTask(state, taskId, context.workspace.activeUserId)) return;
       const targetColumnId = String(data.get("columnId") ?? "backlog");
       const sourceColumn = state.columns.find((column) => column.taskIds.includes(taskId));
       if (sourceColumn?.id !== targetColumnId && !canMoveTaskTo(state, taskId, targetColumnId)) {
@@ -102,17 +137,44 @@ export function createTaskActions(context) {
         context.registerNotice(`Verschieben nicht erlaubt: „${context.columnTitle(targetColumnId)}“ hat das WIP-Limit erreicht.`);
         return;
       }
-      updateTask(state, taskId, { title: data.get("title"), category: data.get("category"), priority: data.get("priority"), assignee: data.get("assignee"), dueDate: data.get("dueDate") });
-      const boardMembers = new Set(state.project.memberIds);
-      const ownerId = String(data.get("ownerId") ?? "");
-      state.tasks[taskId].ownerId = boardMembers.has(ownerId) ? ownerId : null;
-      state.tasks[taskId].memberIds = [...new Set(data.getAll("memberIds").map(String))].filter((id) => boardMembers.has(id) && id !== state.tasks[taskId].ownerId);
       if (sourceColumn?.id !== targetColumnId) {
         const undo = createMoveUndo(state, taskId);
         moveTask(state, taskId, targetColumnId);
         context.registerUndo(undo, `${taskId} nach „${context.columnTitle(targetColumnId)}“ verschoben.`);
       }
-      context.viewState().selectedTaskId = null;
+      context.saveState();
+      context.render();
+    },
+
+    /** @param {string} taskId */
+    claimTask(taskId) {
+      const state = context.state();
+      const userId = context.workspace.activeUserId;
+      if (!canClaimTask(state, taskId, userId)) return;
+      updateTask(state, taskId, { assigneeId: userId });
+      context.saveState();
+      context.render();
+    },
+
+    /** @param {string} taskId */
+    releaseTask(taskId) {
+      const state = context.state();
+      if (!canReleaseTask(state, taskId, context.workspace.activeUserId)) return;
+      updateTask(state, taskId, { assigneeId: null });
+      context.saveState();
+      context.render();
+    },
+
+    /** @param {Event} event */
+    assignTask(event) {
+      event.preventDefault();
+      if (!(event.currentTarget instanceof HTMLFormElement)) return;
+      const data = new FormData(event.currentTarget);
+      const state = context.state();
+      const taskId = String(data.get("taskId") ?? "");
+      if (!canAssignTask(state, taskId, context.workspace.activeUserId)) return;
+      const assigneeId = String(data.get("assigneeId") ?? "");
+      updateTask(state, taskId, { assigneeId: state.project.memberIds.includes(assigneeId) ? assigneeId : null });
       context.saveState();
       context.render();
     },
@@ -120,6 +182,7 @@ export function createTaskActions(context) {
     /** @param {string} taskId */
     deleteTask(taskId) {
       const state = context.state();
+      if (!canDeleteTask(state, taskId, context.workspace.activeUserId)) return;
       const undo = createDeleteUndo(state, taskId);
       removeTask(state, taskId);
       if (context.viewState().selectedTaskId === taskId) context.viewState().selectedTaskId = null;

@@ -36,7 +36,7 @@ export function syncFilterControls(filters) {
   setFormValue(form, "query", filters.query);
   setFormValue(form, "priority", filters.priority);
   setFormValue(form, "category", filters.category);
-  setFormValue(form, "assignee", filters.assignee);
+  setFormValue(form, "assigneeId", filters.assigneeId);
   updateClearFilterButton(filters);
 }
 
@@ -57,8 +57,8 @@ export function updateClearFilterButton(filters) {
 
 /** @param {import("./board.state.js").BoardState} state @param {import("./board.state.js").BoardFilters} filters */
 export function updateFilterOptionCounts(state, filters) {
-  /** @type {Array<"priority" | "category" | "assignee">} */
-  const facets = ["priority", "category", "assignee"];
+  /** @type {Array<"priority" | "category" | "assigneeId">} */
+  const facets = ["priority", "category", "assigneeId"];
   for (const facet of facets) {
     const select = document.querySelector(`.filter-select[name="${facet}"]`);
     if (!(select instanceof HTMLSelectElement)) continue;

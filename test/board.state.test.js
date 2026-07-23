@@ -41,14 +41,14 @@ describe("Board-State", () => {
       title: "  Neue Aufgabe  ",
       category: "UI",
       priority: "high",
-      assignee: "thomas",
+      assigneeId: "user-1",
       columnId: "progress",
     });
 
     assert.equal(created.id, "KAN-25");
     assert.equal(created.title, "Neue Aufgabe");
     assert.equal(created.priority, "high");
-    assert.equal(created.assignee, "TH");
+    assert.equal(created.assigneeId, "user-1");
     assert.ok(state.columns[1].taskIds.includes(created.id));
   });
 
@@ -58,22 +58,22 @@ describe("Board-State", () => {
       title: "Aufgabe",
       category: null,
       priority: "unbekannt",
-      assignee: null,
+      assigneeId: null,
       columnId: "backlog",
     });
     assert.equal(created.category, "Allgemein");
     assert.equal(created.priority, "medium");
-    assert.equal(created.assignee, "TB");
+    assert.equal(created.assigneeId, null);
   });
 
   test("weist fehlenden Titel und unbekannte Spalten zurück", () => {
     const state = createInitialBoardState();
     assert.throws(
-      () => addTask(state, { title: "", category: "", priority: "low", assignee: "", columnId: "backlog" }),
+      () => addTask(state, { title: "", category: "", priority: "low", assigneeId: null, columnId: "backlog" }),
       /title is required/,
     );
     assert.throws(
-      () => addTask(state, { title: "Task", category: "", priority: "low", assignee: "", columnId: "missing" }),
+      () => addTask(state, { title: "Task", category: "", priority: "low", assigneeId: null, columnId: "missing" }),
       /column .* not found/,
     );
   });
@@ -130,12 +130,12 @@ describe("Board-State", () => {
       title: "  Überarbeiteter Titel ",
       category: "",
       priority: "high",
-      assignee: "max",
+      assigneeId: "user-1",
     });
     assert.equal(updated.title, "Überarbeiteter Titel");
     assert.equal(updated.category, "Allgemein");
     assert.equal(updated.priority, "high");
-    assert.equal(updated.assignee, "MA");
+    assert.equal(updated.assigneeId, "user-1");
   });
 
   test("behält nicht geänderte Felder und validiert Updates", () => {
@@ -164,7 +164,7 @@ describe("Board-State", () => {
     assert.equal(matchesTaskFilters(task, filters), true);
     filters.query = "design";
     assert.equal(matchesTaskFilters(task, filters), true);
-    filters.query = "mk";
+    filters.query = "leere zustände";
     assert.equal(matchesTaskFilters(task, filters), true);
     filters.query = "nicht vorhanden";
     assert.equal(matchesTaskFilters(task, filters), false);
@@ -176,12 +176,12 @@ describe("Board-State", () => {
       query: "",
       priority: "medium",
       category: "Design",
-      assignee: "MK",
+      assigneeId: null,
     };
     assert.equal(matchesTaskFilters(task, filters), true);
     assert.equal(matchesTaskFilters(task, { ...filters, priority: "high" }), false);
     assert.equal(matchesTaskFilters(task, { ...filters, category: "Core" }), false);
-    assert.equal(matchesTaskFilters(task, { ...filters, assignee: "TB" }), false);
+    assert.equal(matchesTaskFilters(task, { ...filters, assigneeId: "user-1" }), false);
   });
 
   test("erkennt aktive Filter und liefert einen frischen leeren Filterzustand", () => {
@@ -193,7 +193,7 @@ describe("Board-State", () => {
       query: "",
       priority: "all",
       category: "all",
-      assignee: "all",
+      assigneeId: "all",
     });
   });
 
@@ -203,7 +203,7 @@ describe("Board-State", () => {
     filters.query = "Board";
     filters.priority = "high";
     filters.category = "Core";
-    filters.assignee = "TB";
+    filters.assigneeId = "user-1";
     assert.equal(countActiveFilters(filters), 4);
     filters.query = "   ";
     assert.equal(countActiveFilters(filters), 3);
@@ -214,7 +214,7 @@ describe("Board-State", () => {
     const priorities = countTasksByFacet(state, "priority");
     assert.deepEqual(priorities, { all: 9, medium: 5, low: 1, high: 3 });
 
-    const filters = { ...createEmptyFilters(), assignee: "TB" };
+    const filters = { ...createEmptyFilters(), assigneeId: "user-1" };
     assert.deepEqual(countTasksByFacet(state, "priority", filters), {
       all: 4,
       low: 1,
@@ -367,7 +367,7 @@ describe("Board-State", () => {
     state.columns[2].limitMode = "strict";
     assert.equal(canAcceptTasks(state, "review"), false);
     assert.throws(
-      () => addTask(state, { title: "Neu", category: "QA", priority: "low", assignee: "TB", columnId: "review" }),
+      () => addTask(state, { title: "Neu", category: "QA", priority: "low", assigneeId: "user-1", columnId: "review" }),
       /WIP limit/,
     );
     assert.throws(() => moveTask(state, "KAN-18", "review"), /WIP limit/);
