@@ -1,4 +1,4 @@
-import { canConfigureBoard as userCanConfigureBoard } from "../../board/board.permissions.js";
+import { canConfigureBoard as userCanConfigureBoard, canCreateTask } from "../../board/board.permissions.js";
 import { createFilterControls } from "../../features/filters/filter.map.js";
 import { createNoticeSnackbar, createUndoSnackbar } from "../../features/feedback/feedback.map.js";
 import { createUserSettings } from "../../features/users/user-settings.map.js";
@@ -16,12 +16,17 @@ import { createBoardDialog, createTaskDetails, createTaskDialog } from "./dialog
  */
 export function createBoardPage(state, viewState, actions, workspace) {
   const canConfigureBoard = userCanConfigureBoard(state, workspace.activeUserId);
+  const canCreate = canCreateTask(state, workspace.activeUserId);
   /** @type {import("../../core/JaDyDoCo.js").JaDyNode[]} */
   const configurationButtons = canConfigureBoard
     ? [
         { tagName: "button", type: "button", class: "button button--secondary", text: "Board konfigurieren", events: { click: actions.openBoardConfig } },
         { tagName: "button", type: "button", class: "button button--secondary", text: "Stages konfigurieren", events: { click: actions.openStageConfig } },
       ]
+    : [];
+  /** @type {import("../../core/JaDyDoCo.js").JaDyNode[]} */
+  const taskCreationButtons = canCreate
+    ? [{ tagName: "button", type: "button", class: "button button--primary", text: "+ Neue Aufgabe", events: { click: () => actions.openCreateTask() } }]
     : [];
   return {
   tagName: "div",
@@ -158,7 +163,7 @@ export function createBoardPage(state, viewState, actions, workspace) {
                   class: "board-header__actions",
                   children: [
                     ...configurationButtons,
-                    { tagName: "button", type: "button", class: "button button--primary", text: "+ Neue Aufgabe", events: { click: () => actions.openCreateTask() } },
+                    ...taskCreationButtons,
                   ],
                 },
               ],
@@ -184,12 +189,12 @@ export function createBoardPage(state, viewState, actions, workspace) {
               class: "filter-bar",
               attrs: { role: "search" },
               events: { submit: (event) => event.preventDefault() },
-              children: createFilterControls(state, viewState, actions),
+              children: createFilterControls(state, viewState, actions, workspace.users),
             },
             {
               tagName: "div",
               id: "kanban-region",
-              children: [createKanbanBoard(state, viewState, actions, workspace.users, canConfigureBoard)],
+              children: [createKanbanBoard(state, viewState, actions, workspace.users, canConfigureBoard, workspace.activeUserId, canCreate)],
             },
           ],
         },
@@ -205,9 +210,9 @@ export function createBoardPage(state, viewState, actions, workspace) {
           ? [createNoticeSnackbar(viewState.notice, actions)]
           : [],
     },
-    ...(viewState.createTaskOpen ? [createTaskDialog(state, viewState, actions)] : []),
+    ...(viewState.createTaskOpen ? [createTaskDialog(state, viewState, actions, workspace.users, workspace.activeUserId)] : []),
     ...(viewState.selectedTaskId && state.tasks[viewState.selectedTaskId]
-      ? [createTaskDetails(state, actions, state.tasks[viewState.selectedTaskId], workspace.users)]
+      ? [createTaskDetails(state, actions, state.tasks[viewState.selectedTaskId], workspace.users, workspace.activeUserId, viewState.taskEditOpen)]
       : []),
     ...(canConfigureBoard && viewState.boardConfigOpen ? [createBoardConfig(state, actions, workspace.boards.length > 1, workspace.users, workspace.activeUserId)] : []),
     ...(canConfigureBoard && viewState.stageConfigOpen ? [createStageConfig(state, viewState, actions)] : []),
@@ -322,5 +327,3 @@ function boardLink(board, activeBoardId, index, actions) {
     ],
   };
 }
-
-

@@ -125,7 +125,7 @@ describe("Board-Controller-Integration", () => {
     form.elements.namedItem("title").value = "Integrationstest schreiben";
     form.elements.namedItem("category").value = "QA";
     form.elements.namedItem("priority").value = "high";
-    form.elements.namedItem("assignee").value = "mk";
+    form.elements.namedItem("assigneeId").value = "user-1";
     submit(form);
 
     assert.equal(document.querySelector(".modal"), null);
@@ -135,8 +135,8 @@ describe("Board-Controller-Integration", () => {
     const task = Object.values(saved.boards["board-1"].tasks)
       .find((candidate) => candidate.title === "Integrationstest schreiben");
     assert.deepEqual(
-      { category: task.category, priority: task.priority, assignee: task.assignee },
-      { category: "QA", priority: "high", assignee: "MK" },
+      { category: task.category, priority: task.priority, assigneeId: task.assigneeId },
+      { category: "QA", priority: "high", assigneeId: "user-1" },
     );
     assert.ok(saved.boards["board-1"].columns[0].taskIds.includes(task.id));
   });
@@ -199,7 +199,7 @@ describe("Board-Controller-Integration", () => {
     form.elements.namedItem("title").value = "Ungespeicherte Aufgabe";
     form.elements.namedItem("category").value = "QA";
     form.elements.namedItem("priority").value = "medium";
-    form.elements.namedItem("assignee").value = "TB";
+    form.elements.namedItem("assigneeId").value = "user-1";
     submit(form);
 
     const task = Object.values(controller.getState().tasks)
@@ -260,6 +260,7 @@ describe("Board-Controller-Integration", () => {
 
   test("markiert ein erreichtes hartes WIP-Limit und blockiert den Drop", () => {
     const controller = startController();
+    controller.actions.switchUser("user-demo-mara");
     switchToBoard("Support Operations");
 
     const firstTransfer = dragTransfer();
@@ -283,8 +284,9 @@ describe("Board-Controller-Integration", () => {
     assert.equal(saved.boards["demo-support"].columns.find(({ id }) => id === "triage").taskIds.includes("SUP-32"), false);
   });
 
-  test("ändert Task-Daten nicht, wenn das Ziel-WIP-Limit erreicht ist", async () => {
+  test("ändert den Task-Status nicht, wenn das Ziel-WIP-Limit erreicht ist", async () => {
     const controller = startController();
+    controller.actions.switchUser("user-demo-mara");
     switchToBoard("Support Operations");
 
     const transfer = dragTransfer();
@@ -294,16 +296,14 @@ describe("Board-Controller-Integration", () => {
 
     await new Promise((resolve) => setTimeout(resolve, 200));
     taskCard("SUP-32").click();
-    const form = document.querySelector(".detail-form");
+    const form = document.querySelector(".task-status-form");
     assert.ok(form instanceof HTMLFormElement);
-    form.elements.namedItem("title").value = "Darf nicht übernommen werden";
     const status = form.elements.namedItem("columnId");
     assert.ok(status instanceof HTMLSelectElement);
     status.querySelector('option[value="triage"]').disabled = false;
     status.value = "triage";
     submit(form);
 
-    assert.equal(controller.getState().tasks["SUP-32"].title, "Export enthält falsche Zeitzone");
     assert.equal(controller.getState().columns.find(({ id }) => id === "inbox").taskIds.includes("SUP-32"), true);
     assert.match(document.querySelector(".snackbar--notice")?.textContent ?? "", /WIP-Limit erreicht/);
     controller.destroy();
@@ -389,6 +389,56 @@ describe("Board-Controller-Integration", () => {
     assert.equal(task.todos.some(({ id }) => id === todo.id), false);
     const saved = JSON.parse(localStorage.getItem(BOARD_STORAGE_KEY));
     assert.equal(saved.boards["board-1"].tasks["KAN-18"].todos.some(({ id }) => id === todo.id), false);
+  });
+
+  test("trennt Task-Arbeitsansicht und Metadaten-Bearbeitung", () => {
+    const controller = startController();
+    taskCard("KAN-18").click();
+
+    assert.ok(document.querySelector(".task-work-form"));
+    assert.equal(document.querySelector(".task-edit-form"), null);
+    findButton("Bearbeiten").click();
+
+    const form = document.querySelector(".task-edit-form");
+    assert.ok(form instanceof HTMLFormElement);
+    form.elements.namedItem("title").value = "Überarbeitete Arbeitsansicht";
+    form.elements.namedItem("priority").value = "high";
+    submit(form);
+
+    assert.ok(document.querySelector(".task-work-form"));
+    assert.equal(document.querySelector(".task-edit-form"), null);
+    assert.equal(controller.getState().tasks["KAN-18"].title, "Überarbeitete Arbeitsansicht");
+    assert.equal(controller.getState().tasks["KAN-18"].priority, "high");
+  });
+
+  test("erlaubt Mitgliedern freie Tasks zu übernehmen und wieder freizugeben", () => {
+    const controller = startController();
+    controller.actions.switchUser("user-demo-lukas");
+    switchToBoard("Support Operations");
+    taskCard("SUP-32").click();
+
+    assert.equal(controller.getState().tasks["SUP-32"].assigneeId, null);
+    findButton("Task übernehmen").click();
+    assert.equal(controller.getState().tasks["SUP-32"].assigneeId, "user-demo-lukas");
+    assert.ok(findButton("Bearbeiten"));
+
+    findButton("Zuweisung zurückgeben").click();
+    assert.equal(controller.getState().tasks["SUP-32"].assigneeId, null);
+    assert.equal([...document.querySelectorAll("button")].some((button) => button.textContent.trim() === "Bearbeiten"), false);
+  });
+
+  test("hält fremde Tasks für Board-Mitglieder schreibgeschützt", () => {
+    const controller = startController();
+    controller.actions.switchUser("user-demo-mara");
+    switchToBoard("Product Launch");
+    taskCard("LAUNCH-03").click();
+
+    assert.equal(document.querySelector("#new-todo"), null);
+    assert.equal([...document.querySelectorAll("button")].some((button) => button.textContent.trim() === "Bearbeiten"), false);
+    const before = structuredClone(controller.getState().tasks["LAUNCH-03"]);
+    controller.actions.addTodo("LAUNCH-03");
+    controller.actions.deleteTask("LAUNCH-03");
+    assert.deepEqual(controller.getState().tasks["LAUNCH-03"], before);
   });
 
   test("übersetzt erwartbare Domain-Fehler in sichtbares Feedback", () => {

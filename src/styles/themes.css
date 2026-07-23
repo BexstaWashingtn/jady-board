@@ -37,6 +37,7 @@
 [data-theme="dark"] .stage-editor select,
 [data-theme="dark"] .board-details-form input,
 [data-theme="dark"] .board-details-form textarea,
+[data-theme="dark"] .board-details-form select,
 [data-theme="dark"] .board-create-form input,
 [data-theme="dark"] .board-create-form textarea,
 [data-theme="dark"] .user-form input,
@@ -44,6 +45,13 @@
   color: #e3e4e7;
   border-color: #41454f;
   background: #191c21;
+}
+[data-theme="dark"] select option {
+  color: #e3e4e7;
+  background: #191c21;
+}
+[data-theme="dark"] .form-label {
+  color: #bdc2d1;
 }
 [data-theme="dark"] .button--secondary {
   color: #c3c6cd;
@@ -285,7 +293,8 @@
   color: #e4e6ec;
 }
 [data-theme="dark"] .stage-row__content small,
-[data-theme="dark"] .field-help {
+[data-theme="dark"] .field-help,
+[data-theme="dark"] .config-intro {
   color: #969dad;
 }
 [data-theme="dark"] .stage-row__actions button {
@@ -419,6 +428,15 @@
   color: #b8bdc9;
   background: #252a35;
 }
+[data-theme="dark"] .task-edit-button {
+  color: #c4bbff;
+  border-color: #3b4256;
+  background: #242a39;
+}
+[data-theme="dark"] .task-assignment {
+  border-color: #30364a;
+  background: #191e2b;
+}
 [data-theme="dark"] .button--danger {
   color: #f0a0a0;
   border-color: #70484a;
@@ -430,6 +448,21 @@
 [data-theme="dark"] .board-danger-zone {
   border-color: #70484a;
   background: rgba(128, 51, 55, 0.11);
+}
+[data-theme="dark"] .board-danger-zone h3 {
+  color: #ffaaa8;
+}
+[data-theme="dark"] .board-danger-zone p {
+  color: #d5a4a4;
+}
+[data-theme="dark"] .board-template-stages {
+  border-color: #3a4054;
+}
+[data-theme="dark"] .board-details-form input:focus,
+[data-theme="dark"] .board-details-form textarea:focus,
+[data-theme="dark"] .board-details-form select:focus {
+  border-color: #8172eb;
+  box-shadow: 0 0 0 3px rgba(139, 124, 246, 0.14);
 }
 [data-theme="dark"] .board-details-form,
 [data-theme="dark"] .user-form {

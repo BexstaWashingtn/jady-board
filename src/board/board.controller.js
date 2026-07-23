@@ -9,7 +9,7 @@ import { createUserActions } from "./actions/user.actions.js";
 import { actionErrorMessage, guardActions } from "./actions/action-guard.js";
 import { ensureShowcaseData } from "./board.demo-data.js";
 import { createDialogManager } from "./board.dialog-manager.js";
-import { canConfigureBoard } from "./board.permissions.js";
+import { canConfigureBoard, canCreateTask } from "./board.permissions.js";
 import { loadWorkspace, persistWorkspace } from "./board.persistence.js";
 import { createBoardViewState } from "./board.view-state.js";
 
@@ -130,7 +130,7 @@ export function createBoardController(app) {
   function renderKanban() {
     const region = document.querySelector("#kanban-region");
     if (!(region instanceof HTMLElement)) { render(); return; }
-    app.replace(createKanbanBoard(state, viewState, actions, Object.values(workspace.users), isBoardOwner()), region);
+    app.replace(createKanbanBoard(state, viewState, actions, Object.values(workspace.users), isBoardOwner(), workspace.activeUserId, canCreateTask(state, workspace.activeUserId)), region);
   }
 
   function renderUndoRegion() {

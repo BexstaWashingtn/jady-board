@@ -1,4 +1,5 @@
 import { canAcceptTasks, getDueDateStatus, hasActiveFilters, matchesTaskFilters } from "../../board/board.state.js";
+import { canWorkOnTask } from "../../board/board.permissions.js";
 
 /**
  * @param {import("../../board/board.state.js").BoardState} state
@@ -6,9 +7,11 @@ import { canAcceptTasks, getDueDateStatus, hasActiveFilters, matchesTaskFilters 
  * @param {import("./board.types.js").BoardActions} actions
  * @param {import("./board.types.js").UserView[]} [users]
  * @param {boolean} [canConfigure]
+ * @param {string} [activeUserId]
+ * @param {boolean} [canCreate]
  * @returns {import("../../core/JaDyDoCo.js").JaDyNode}
  */
-export function createKanbanBoard(state, viewState, actions, users = [], canConfigure = true) {
+export function createKanbanBoard(state, viewState, actions, users = [], canConfigure = true, activeUserId = "", canCreate = true) {
   const filtersActive = hasActiveFilters(viewState.filters);
   let totalVisible = 0;
 
@@ -22,7 +25,7 @@ export function createKanbanBoard(state, viewState, actions, users = [], canConf
       ? `${tasks.length} / ${column.taskIds.length}`
       : String(column.taskIds.length);
     const cards = tasks.length
-      ? tasks.map((task) => taskCard(task, column.kind === "done", actions, !filtersActive, users))
+      ? tasks.map((task) => taskCard(task, column.kind === "done", actions, !filtersActive && canWorkOnTask(state, task.id, activeUserId), users))
       : [emptyColumn(filtersActive)];
 
     return kanbanColumn(
@@ -41,6 +44,7 @@ export function createKanbanBoard(state, viewState, actions, users = [], canConf
       actions,
       !filtersActive,
       canConfigure,
+      canCreate,
     );
   });
 
@@ -103,9 +107,10 @@ function emptyColumn(filtered) {
  * @param {import("./board.types.js").BoardActions} actions
  * @param {boolean} dragEnabled
  * @param {boolean} canConfigure
+ * @param {boolean} canCreate
  * @returns {import("../../core/JaDyDoCo.js").JaDyNode}
  */
-function kanbanColumn(title, count, status, color, limit, limitMode, totalTasks, canAddTask, menuOpen, columnIndex, columnCount, cards, actions, dragEnabled, canConfigure) {
+function kanbanColumn(title, count, status, color, limit, limitMode, totalTasks, canAddTask, menuOpen, columnIndex, columnCount, cards, actions, dragEnabled, canConfigure, canCreate) {
   const limitReached = limit !== null && totalTasks >= limit;
   /** @type {import("../../core/JaDyDoCo.js").JaDyNode[]} */
   const configurationMenu = canConfigure
@@ -169,8 +174,8 @@ function kanbanColumn(title, count, status, color, limit, limitMode, totalTasks,
         tagName: "button",
         type: "button",
         class: "add-task",
-        text: canAddTask ? "+ Aufgabe hinzufügen" : "WIP-Limit erreicht",
-        disabled: !canAddTask,
+        text: !canCreate ? "Keine Berechtigung" : canAddTask ? "+ Aufgabe hinzufügen" : "WIP-Limit erreicht",
+        disabled: !canCreate || !canAddTask,
         events: { click: () => actions.openCreateTask(status) },
       },
     ],
@@ -243,12 +248,9 @@ function menuButton(text, onClick, disabled = false, danger = false) {
 
 /** @param {import("../../board/board.state.js").BoardTask} task @param {import("./board.types.js").UserView[]} users @returns {import("../../core/JaDyDoCo.js").JaDyNode[]} */
 function taskPeople(task, users) {
-  const ids = [...new Set([task.ownerId, ...task.memberIds].filter(Boolean))];
-  if (!ids.length) return [{ tagName: "span", class: "task-member", text: task.assignee, attrs: { title: "Verantwortlich (Bestandsdaten)" } }];
-  return ids.slice(0, 3).map((id) => {
-    const user = users.find((item) => item.id === id);
-    return { tagName: "span", class: ["task-member", id === task.ownerId && "task-member--owner"], text: user?.initials ?? "?", attrs: { title: `${user?.name ?? "Unbekannt"}${id === task.ownerId ? " · Owner" : ""}` } };
-  });
+  if (!task.assigneeId) return [{ tagName: "span", class: "task-member", text: "–", attrs: { title: "Nicht zugewiesen" } }];
+  const user = users.find((item) => item.id === task.assigneeId);
+  return [{ tagName: "span", class: "task-member", text: user?.initials ?? "?", attrs: { title: user?.name ?? "Unbekannt" } }];
 }
 
 /**
@@ -376,5 +378,3 @@ function commentLabel(comments) {
   if (!comments) return "";
   return `${comments} ${comments === 1 ? "Kommentar" : "Kommentare"}`;
 }
-
-

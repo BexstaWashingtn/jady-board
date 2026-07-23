@@ -13,7 +13,7 @@ Das Projekt läuft vollständig im Browser. Boards, Aufgaben, Benutzerprofile un
 - Aufgaben erstellen, bearbeiten, verschieben und löschen
 - Aufgaben per Drag-and-drop innerhalb einer Stage oder zwischen Stages sortieren
 - Titel, Kategorie, Priorität, Verantwortliche und Fälligkeitsdatum verwalten
-- Mitglieder einer Aufgabe zuordnen
+- Einen Bearbeiter aus den Board-Mitgliedern zuordnen
 - Todos anlegen, bearbeiten, abhaken und löschen
 - Verschieben und Löschen einer Aufgabe unmittelbar rückgängig machen
 
@@ -63,9 +63,9 @@ Der aktive Benutzer wird automatisch Owner des neuen Boards.
 
 ### Eine Aufgabe erstellen und bearbeiten
 
-Über **Aufgabe hinzufügen** in einer Stage wird eine neue Aufgabe angelegt. Ein Klick auf eine Aufgabenkarte öffnet die Detailansicht. Dort lassen sich Metadaten, Fälligkeit, Owner, Mitglieder und Todos pflegen.
+Über **Aufgabe hinzufügen** in einer Stage wird eine neue Aufgabe angelegt. Ein Klick auf eine Aufgabenkarte öffnet die Arbeitsansicht für Status, Zuweisung und Todos. Berechtigte Benutzer erreichen über **Bearbeiten** eine getrennte Ansicht für Titel, Kategorie, Priorität und Fälligkeit.
 
-Aufgaben können mit der Maus verschoben und neu sortiert werden. Aktive Filter deaktivieren das Drag-and-drop-Sortieren, weil dabei nicht alle Kartenpositionen sichtbar sind.
+Aufgaben können vom Board-Owner oder ihrem Bearbeiter mit der Maus verschoben und neu sortiert werden. Aktive Filter deaktivieren das Drag-and-drop-Sortieren, weil dabei nicht alle Kartenpositionen sichtbar sind.
 
 ### Stages konfigurieren
 
@@ -80,10 +80,11 @@ Ein striktes WIP-Limit verhindert weitere Aufgaben in einer vollen Stage. Ein wa
 
 ### Rollen und Berechtigungen
 
-JaDy Board unterscheidet zwischen Ownern und Mitgliedern:
+JaDy Board unterscheidet zwischen Board-Ownern, Mitgliedern und dem Bearbeiter einer Aufgabe:
 
-- **Owner:** darf Board-Daten, Mitglieder und Workflow-Stages konfigurieren.
-- **Mitglied:** gehört zum Board und kann für Aufgaben ausgewählt werden.
+- **Board-Owner:** konfiguriert Board, Mitglieder und Workflow, weist Aufgaben zu und darf Aufgaben löschen.
+- **Bearbeiter:** pflegt Todos, verschiebt und bearbeitet die zugewiesene Aufgabe und kann die Zuweisung zurückgeben.
+- **Mitglied:** darf Aufgaben lesen, neue Aufgaben erstellen und nicht zugewiesene Aufgaben selbst übernehmen.
 
 Die Benutzerprofile sind lokale App-Profile und keine echten, serverseitig authentifizierten Konten. Sie dienen dazu, Rollen und Teamabläufe innerhalb der Demo-Anwendung abzubilden.
 
@@ -181,7 +182,7 @@ Wichtig: Es gibt derzeit kein Backend, keine Cloud-Synchronisierung und keinen a
 - **Workspace:** Benutzerprofile, aktive Benutzer-ID, Boards und aktive Board-ID
 - **Board:** Projektinformationen, Stages und Aufgaben
 - **Stage:** Typ, Farbe, WIP-Limit, Übergangsregeln, Abschlussregel und sortierte Aufgaben-IDs
-- **Aufgabe:** Titel, Kategorie, Priorität, Fälligkeit, Owner, Mitglieder und Todos
+- **Aufgabe:** Titel, Kategorie, Priorität, Fälligkeit, optionaler Bearbeiter und Todos
 - **Todo:** Text und Erledigt-Status
 
 ## Showcase-Daten

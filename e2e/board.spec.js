@@ -24,7 +24,7 @@ test("erstellt eine Aufgabe über den vollständigen Browser-Workflow", async ({
   await dialog.getByLabel("Titel").fill("Browser-Smoke-Test ergänzen");
   await dialog.getByLabel("Priorität").selectOption("high");
   await dialog.getByLabel("Kategorie").fill("QA");
-  await dialog.getByLabel("Verantwortlich").fill("E2");
+  await dialog.getByLabel("Bearbeiter").selectOption({ label: "Thomas" });
   await dialog.getByRole("button", { name: "Aufgabe erstellen" }).click();
 
   await expect(dialog).toBeHidden();
@@ -34,6 +34,21 @@ test("erstellt eine Aufgabe über den vollständigen Browser-Workflow", async ({
   await expect(card).toContainText("Hoch");
 });
 
+test("trennt Task-Arbeit und Task-Konfiguration", async ({ page }) => {
+  await page.locator('.task-card[data-task-id="KAN-18"]').click();
+
+  const workDialog = page.getByRole("dialog", { name: /Leere Zustände/ });
+  await expect(workDialog.getByText("Todos", { exact: true })).toBeVisible();
+  await workDialog.getByRole("button", { name: "Task bearbeiten" }).click();
+
+  const editDialog = page.getByRole("dialog", { name: "Task bearbeiten" });
+  await editDialog.getByLabel("Titel").fill("Getrennte Task-Konfiguration");
+  await editDialog.getByRole("button", { name: "Änderungen speichern" }).click();
+
+  await expect(page.getByRole("dialog", { name: "Getrennte Task-Konfiguration" })).toBeVisible();
+  await expect(page.locator('.task-card[data-task-id="KAN-18"]')).toContainText("Getrennte Task-Konfiguration");
+});
+
 test("behält erstellte Aufgaben nach einem Reload", async ({ page }) => {
   await page.getByRole("button", { name: "+ Neue Aufgabe" }).click();
   const dialog = page.getByRole("dialog", { name: "Task zum Board hinzufügen" });
@@ -41,12 +56,33 @@ test("behält erstellte Aufgaben nach einem Reload", async ({ page }) => {
   await dialog.getByRole("button", { name: "Aufgabe erstellen" }).click();
 
   const savedWorkspace = await page.evaluate((key) => JSON.parse(localStorage.getItem(key)), storageKey);
-  expect(savedWorkspace.version).toBe(4);
+  expect(savedWorkspace.version).toBe(5);
   expect(Object.values(savedWorkspace.boards["board-1"].tasks))
     .toEqual(expect.arrayContaining([expect.objectContaining({ title: "Persistente Browser-Aufgabe" })]));
 
   await page.reload();
   await expect(page.getByRole("button", { name: /Persistente Browser-Aufgabe öffnen/ })).toBeVisible();
+});
+
+test("speichert Board-Daten über den sichtbaren Speicherbutton", async ({ page }) => {
+  await page.getByRole("button", { name: "Board konfigurieren" }).click();
+
+  const dialog = page.getByRole("dialog", { name: "Board konfigurieren" });
+  await dialog.getByLabel("Boardname").fill("Delivery Board");
+  await dialog.getByLabel("Untertitel").fill("Release-Steuerung");
+  await dialog.getByRole("button", { name: "Board-Daten speichern" }).click();
+
+  const project = await page.evaluate((key) => {
+    const workspace = JSON.parse(localStorage.getItem(key));
+    return workspace.boards["board-1"].project;
+  }, storageKey);
+  expect(project).toMatchObject({
+    name: "Delivery Board",
+    description: "Release-Steuerung",
+    path: "Boards / Delivery Board",
+  });
+  await expect(dialog).toBeHidden();
+  await expect(page.getByRole("heading", { level: 1, name: "Delivery Board" })).toBeVisible();
 });
 
 test("verschiebt eine Aufgabe per Drag-and-drop und bietet Undo an", async ({ page }) => {
@@ -109,6 +145,17 @@ test("wendet Theme-Tokens und das mobile Layout an", async ({ page }) => {
   await expect(page.locator(".sidebar")).toBeHidden();
   await expect(page.locator(".topbar")).toHaveCSS("height", "58px");
   await expect(page.locator(".workspace")).toHaveCSS("display", "block");
+});
+
+test("hält Formulare und Konfigurationen im Dark Theme lesbar", async ({ page }) => {
+  await page.evaluate(() => { document.documentElement.dataset.theme = "dark"; });
+  await page.getByRole("button", { name: "Board konfigurieren" }).click();
+
+  const dialog = page.getByRole("dialog", { name: "Board konfigurieren" });
+  await expect(dialog.getByLabel("Board-Owner")).toHaveCSS("color", "rgb(227, 228, 231)");
+  await expect(dialog.getByLabel("Board-Owner")).toHaveCSS("background-color", "rgb(25, 28, 33)");
+  await expect(dialog.getByText("Boardname", { exact: true })).toHaveCSS("color", "rgb(189, 194, 209)");
+  await expect(dialog.getByRole("heading", { name: "Board löschen" })).toHaveCSS("color", "rgb(255, 170, 168)");
 });
 
 test("exportiert und importiert den vollständigen Workspace mit Vorschau", async ({ page }) => {

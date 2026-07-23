@@ -1108,6 +1108,54 @@
 .detail-form {
   padding: 24px 26px;
 }
+.drawer-header__actions,
+.task-assignment__controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.task-edit-button {
+  min-height: 34px;
+  padding: 0 11px;
+  border: 1px solid var(--color-border);
+  border-radius: 7px;
+  color: var(--color-primary);
+  background: var(--color-surface-subtle);
+  cursor: pointer;
+  font-weight: 700;
+}
+.task-edit-back {
+  min-height: 34px;
+  margin: 0;
+}
+.task-status-form,
+.task-assignment {
+  margin-bottom: 18px;
+}
+.task-assignment {
+  padding: 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 9px;
+  background: var(--color-surface-subtle);
+}
+.task-assignment > strong {
+  display: block;
+  margin: 6px 0 10px;
+}
+.task-assignment__controls select {
+  flex: 1 1 auto;
+}
+.task-assignment__controls .button,
+.task-assignment > .button {
+  flex: 0 0 auto;
+  margin: 0;
+}
+.task-work-form .task-todo-editor {
+  margin-top: 4px;
+}
+.todo-row input[readonly] {
+  cursor: default;
+}
 .detail-form .form-label {
   margin-top: 17px;
 }
@@ -1339,6 +1387,8 @@
   box-shadow: 0 0 0 3px rgba(139, 124, 246, 0.12);
 }
 .board-details-form .button {
+  display: block;
+  margin-left: auto;
   margin-top: 14px;
 }
 .board-danger-zone {
