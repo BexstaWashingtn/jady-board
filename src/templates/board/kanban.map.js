@@ -122,7 +122,7 @@ function kanbanColumn(title, count, status, color, limit, limitMode, totalTasks,
             tagName: "button",
             type: "button",
             class: "column-menu",
-            text: "•••",
+            text: "⋮",
             attrs: {
               "aria-label": `${title} Optionen`,
               "aria-haspopup": "menu",

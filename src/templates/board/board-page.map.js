@@ -3,7 +3,7 @@ import { createFilterControls } from "../../features/filters/filter.map.js";
 import { createNoticeSnackbar, createUndoSnackbar } from "../../features/feedback/feedback.map.js";
 import { createUserSettings } from "../../features/users/user-settings.map.js";
 import { createAppSettings } from "../../features/settings/app-settings.map.js";
-import { createBoardConfig, createStageConfig } from "./config.map.js";
+import { createBoardConfig, createStageConfig, createStageEditorDialog } from "./config.map.js";
 import { createKanbanBoard } from "./kanban.map.js";
 import { createBoardDialog, createTaskDetails, createTaskDialog } from "./dialogs.map.js";
 
@@ -216,6 +216,7 @@ export function createBoardPage(state, viewState, actions, workspace) {
       : []),
     ...(canConfigureBoard && viewState.boardConfigOpen ? [createBoardConfig(state, actions, workspace.boards.length > 1, workspace.users, workspace.activeUserId)] : []),
     ...(canConfigureBoard && viewState.stageConfigOpen ? [createStageConfig(state, viewState, actions)] : []),
+    ...(canConfigureBoard && viewState.stageEditor && !viewState.stageConfigOpen ? [createStageEditorDialog(state, viewState, actions)] : []),
     ...(workspace.createOpen ? [createBoardDialog(actions)] : []),
     ...(workspace.userSettingsOpen ? [createUserSettings(workspace, actions)] : []),
     ...(workspace.appSettingsOpen ? [createAppSettings(workspace, actions)] : []),

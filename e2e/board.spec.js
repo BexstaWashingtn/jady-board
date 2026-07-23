@@ -85,6 +85,21 @@ test("speichert Board-Daten über den sichtbaren Speicherbutton", async ({ page 
   await expect(page.getByRole("heading", { level: 1, name: "Delivery Board" })).toBeVisible();
 });
 
+test("öffnet Stage-Aktionen direkt ohne globale Stage-Konfiguration", async ({ page }) => {
+  await page.getByRole("button", { name: "Backlog Optionen" }).click();
+  await page.getByRole("menu", { name: "Backlog Aktionen" })
+    .getByRole("menuitem", { name: "Stage bearbeiten" }).click();
+
+  const dialog = page.getByRole("dialog", { name: "„Backlog“ bearbeiten" });
+  await expect(dialog).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Stages konfigurieren" })).toHaveCount(0);
+  await dialog.getByLabel("Name").fill("Ideenspeicher");
+  await dialog.getByRole("button", { name: "Speichern" }).click();
+
+  await expect(dialog).toBeHidden();
+  await expect(page.getByRole("heading", { level: 2, name: "Ideenspeicher" })).toBeVisible();
+});
+
 test("verschiebt eine Aufgabe per Drag-and-drop und bietet Undo an", async ({ page }) => {
   const task = page.locator('.task-card[data-task-id="KAN-18"]');
   const target = page.locator('.kanban-column[data-status="progress"]');

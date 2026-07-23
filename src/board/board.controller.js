@@ -87,6 +87,7 @@ export function createBoardController(app) {
     else if (viewState.createTaskOpen) actions.closeCreateTask();
     else if (viewState.selectedTaskId) actions.closeTask();
     else if (viewState.stageConfigOpen) actions.closeStageConfig();
+    else if (viewState.stageEditor) actions.cancelStageEditor();
     else if (viewState.boardConfigOpen) actions.closeBoardConfig();
   }
 

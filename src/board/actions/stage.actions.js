@@ -39,7 +39,7 @@ export function createStageActions(context) {
       const viewState = context.viewState();
       viewState.openColumnMenuId = null;
       viewState.boardConfigOpen = false;
-      viewState.stageConfigOpen = true;
+      viewState.stageConfigOpen = false;
       viewState.stageEditor = { mode: "edit", columnId };
       context.render();
       context.scrollToStageEditor();
@@ -50,7 +50,7 @@ export function createStageActions(context) {
       const viewState = context.viewState();
       viewState.openColumnMenuId = null;
       viewState.boardConfigOpen = false;
-      viewState.stageConfigOpen = true;
+      viewState.stageConfigOpen = false;
       viewState.stageEditor = { mode: "delete", columnId };
       context.render();
     },

@@ -119,6 +119,44 @@ export function createStageConfig(state, viewState, actions) {
 }
 
 /**
+ * Focused editor opened directly from a column's context menu.
+ *
+ * @param {import("../../board/board.state.js").BoardState} state
+ * @param {import("../../board/board.view-state.js").BoardViewState} viewState
+ * @param {import("./board.types.js").BoardActions} actions
+ * @returns {import("../../core/JaDyDoCo.js").JaDyNode}
+ */
+export function createStageEditorDialog(state, viewState, actions) {
+  const column = viewState.stageEditor?.columnId
+    ? state.columns.find(({ id }) => id === viewState.stageEditor?.columnId)
+    : null;
+  const deleting = viewState.stageEditor?.mode === "delete";
+  return {
+    tagName: "div",
+    class: "drawer-backdrop config-backdrop",
+    children: [{
+      tagName: "aside",
+      class: "task-drawer config-drawer stage-direct-editor",
+      attrs: { role: "dialog", "aria-modal": "true", "aria-labelledby": "direct-stage-editor-title" },
+      children: [
+        {
+          tagName: "header",
+          class: "drawer-header",
+          children: [
+            { tagName: "div", children: [
+              { tagName: "span", class: "modal__eyebrow", text: deleting ? "Stage entfernen" : "Workflow-Stage" },
+              { tagName: "h2", id: "direct-stage-editor-title", text: column ? `„${column.title}“ ${deleting ? "löschen" : "bearbeiten"}` : "Stage bearbeiten" },
+            ] },
+            { tagName: "button", type: "button", class: "modal__close", text: "×", attrs: { "aria-label": "Stage-Bearbeitung schließen" }, events: { click: actions.cancelStageEditor } },
+          ],
+        },
+        { tagName: "div", class: "config-content", children: [stageEditor(state, viewState, actions)] },
+      ],
+    }],
+  };
+}
+
+/**
  * @param {import("../../board/board.state.js").BoardColumn} column
  * @param {number} index
  * @param {number} total
@@ -354,7 +392,5 @@ function kindLabel(kind) {
   const labels = { backlog: "Backlog", active: "In Arbeit", review: "Review", done: "Erledigt" };
   return labels[kind] ?? "In Arbeit";
 }
-
-
 
 
