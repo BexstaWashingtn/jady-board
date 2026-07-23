@@ -9,6 +9,6 @@
     "moduleResolution": "Bundler",
     "lib": ["ES2022", "DOM"]
   },
-  "include": ["src/**/*.js", "test-d/**/*.js"],
+  "include": ["src/**/*.js", "server/**/*.js", "test-d/**/*.js"],
   "exclude": ["src/core/JaDyDoCo_legacy.js"]
 }

@@ -200,6 +200,38 @@ Diese Daten erleichtern das Ausprobieren der erweiterten Workflow-Funktionen.
 
 Die Anwendung setzt moderne Browser-APIs voraus, insbesondere ES-Module, `structuredClone`, `localStorage`, `matchMedia`, Drag-and-drop und `Intl.DateTimeFormat`. Aktuelle Versionen von Chrome, Edge, Firefox und Safari sind die primären Zielbrowser.
 
+## Server und PostgreSQL
+
+Die Servermigration wird parallel zum weiterhin funktionsfähigen Local-first-Client aufgebaut. Die erste Ausbaustufe enthält einen Node.js-HTTP-Server, PostgreSQL-Migrationen und getrennte Liveness- und Readiness-Endpunkte. Board-Daten werden noch nicht aus der API geladen.
+
+### Lokale Datenbank starten
+
+Voraussetzungen sind Docker mit Compose-Unterstützung und eine unterstützte Node.js-LTS-Version.
+
+```bash
+docker compose up -d postgres
+```
+
+Die Standardkonfiguration liegt in `.env.example`. Node.js lädt `.env` nicht automatisch; die Werte müssen vor dem Start als Umgebungsvariablen gesetzt oder mit einem geeigneten Prozessmanager geladen werden.
+
+```bash
+# Datenbankschema anlegen oder aktualisieren
+npm run db:migrate
+
+# API mit automatischem Neustart entwickeln
+npm run dev:server
+
+# API ohne Watch-Modus starten
+npm run start:server
+```
+
+Die API verwendet standardmäßig Port `3000`:
+
+- `GET /api/health` prüft, ob der Node.js-Prozess antwortet.
+- `GET /api/ready` prüft zusätzlich die PostgreSQL-Verbindung.
+
+Das initiale relationale Schema trennt Benutzer, Präferenzen, Boards, Mitglieder, Stages, Stage-Übergänge, Tasks und Todos. Positions- und Versionsfelder bereiten sortierbare Inhalte und optimistische Nebenläufigkeitskontrolle vor.
+
 ## Aktuelle Grenzen
 
 - Daten werden ausschließlich lokal im aktuellen Browser gespeichert.
