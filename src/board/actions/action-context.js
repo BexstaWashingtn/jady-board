@@ -27,6 +27,7 @@
  * @property {(columnId: string) => string} columnTitle
  * @property {(taskId: string, targetColumnId: string) => string} moveRejectionMessage
  * @property {(taskId: string, targetColumnId: string) => string} moveRejectionLabel
+ * @property {(workspace: import("../board.persistence.js").BoardWorkspace) => void} replaceWorkspace
  */
 
 export {};

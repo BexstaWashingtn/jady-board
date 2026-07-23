@@ -283,6 +283,32 @@ describe("Board-Controller-Integration", () => {
     assert.equal(saved.boards["demo-support"].columns.find(({ id }) => id === "triage").taskIds.includes("SUP-32"), false);
   });
 
+  test("ändert Task-Daten nicht, wenn das Ziel-WIP-Limit erreicht ist", async () => {
+    const controller = startController();
+    switchToBoard("Support Operations");
+
+    const transfer = dragTransfer();
+    controller.actions.startTaskDrag(dragEvent(taskCard("SUP-31"), transfer), "SUP-31");
+    controller.actions.dropTask(dragEvent(column("triage"), transfer), "triage");
+    controller.actions.dismissUndo();
+
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    taskCard("SUP-32").click();
+    const form = document.querySelector(".detail-form");
+    assert.ok(form instanceof HTMLFormElement);
+    form.elements.namedItem("title").value = "Darf nicht übernommen werden";
+    const status = form.elements.namedItem("columnId");
+    assert.ok(status instanceof HTMLSelectElement);
+    status.querySelector('option[value="triage"]').disabled = false;
+    status.value = "triage";
+    submit(form);
+
+    assert.equal(controller.getState().tasks["SUP-32"].title, "Export enthält falsche Zeitzone");
+    assert.equal(controller.getState().columns.find(({ id }) => id === "inbox").taskIds.includes("SUP-32"), true);
+    assert.match(document.querySelector(".snackbar--notice")?.textContent ?? "", /WIP-Limit erreicht/);
+    controller.destroy();
+  });
+
   test("erstellt, bearbeitet, verschiebt und löscht eine Stage über die Konfiguration", () => {
     const controller = startController();
     findButton("Stages konfigurieren").click();
@@ -363,6 +389,23 @@ describe("Board-Controller-Integration", () => {
     assert.equal(task.todos.some(({ id }) => id === todo.id), false);
     const saved = JSON.parse(localStorage.getItem(BOARD_STORAGE_KEY));
     assert.equal(saved.boards["board-1"].tasks["KAN-18"].todos.some(({ id }) => id === todo.id), false);
+  });
+
+  test("übersetzt erwartbare Domain-Fehler in sichtbares Feedback", () => {
+    const controller = startController();
+    taskCard("KAN-18").click();
+
+    const input = document.querySelector("#new-todo");
+    assert.ok(input instanceof HTMLInputElement);
+    input.value = "   ";
+
+    assert.doesNotThrow(() => controller.actions.addTodo("KAN-18"));
+    assert.match(
+      document.querySelector(".snackbar--notice")?.textContent ?? "",
+      /todo text is required/i,
+    );
+    assert.equal(controller.getState().tasks["KAN-18"].todos.length, 0);
+    controller.destroy();
   });
 
   test("erstellt, bearbeitet, wechselt und löscht ein lokales Benutzerprofil", () => {

@@ -98,6 +98,10 @@ export function createTaskActions(context) {
         context.registerNotice(context.moveRejectionMessage(taskId, targetColumnId));
         return;
       }
+      if (sourceColumn?.id !== targetColumnId && !canAcceptTasks(state, targetColumnId, 1, taskId)) {
+        context.registerNotice(`Verschieben nicht erlaubt: „${context.columnTitle(targetColumnId)}“ hat das WIP-Limit erreicht.`);
+        return;
+      }
       updateTask(state, taskId, { title: data.get("title"), category: data.get("category"), priority: data.get("priority"), assignee: data.get("assignee"), dueDate: data.get("dueDate") });
       const boardMembers = new Set(state.project.memberIds);
       const ownerId = String(data.get("ownerId") ?? "");

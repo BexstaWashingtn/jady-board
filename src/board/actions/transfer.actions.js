@@ -73,15 +73,7 @@ export function createTransferActions(context) {
         return;
       }
 
-      context.workspace.activeBoardId = preview.workspace.activeBoardId;
-      context.workspace.boards = preview.workspace.boards;
-      context.workspace.activeUserId = preview.workspace.activeUserId;
-      context.workspace.users = preview.workspace.users;
-      Object.keys(context.boardViewStates).forEach((id) => delete context.boardViewStates[id]);
-      context.setState(context.workspace.boards[context.workspace.activeBoardId]);
-      context.setViewState(context.getBoardViewState(context.workspace.activeBoardId));
-      context.clearUndoTimer();
-      context.closeBoardAdministration();
+      context.replaceWorkspace(preview.workspace);
       context.overlays.appSettingsOpen = false;
       context.overlays.transfer.preview = null;
       context.overlays.transfer.error = null;

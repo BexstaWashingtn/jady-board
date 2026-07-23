@@ -6,6 +6,7 @@ import { createStageActions } from "./actions/stage.actions.js";
 import { createTaskActions } from "./actions/task.actions.js";
 import { createTransferActions } from "./actions/transfer.actions.js";
 import { createUserActions } from "./actions/user.actions.js";
+import { actionErrorMessage, guardActions } from "./actions/action-guard.js";
 import { ensureShowcaseData } from "./board.demo-data.js";
 import { createDialogManager } from "./board.dialog-manager.js";
 import { canConfigureBoard } from "./board.permissions.js";
@@ -56,9 +57,10 @@ export function createBoardController(app) {
     columnTitle,
     moveRejectionMessage,
     moveRejectionLabel,
+    replaceWorkspace,
   };
 
-  const actions = {
+  const rawActions = {
     ...createBoardActions(context),
     ...createUserActions(context),
     ...createStageActions(context),
@@ -67,6 +69,7 @@ export function createBoardController(app) {
     ...createFilterActions(context),
     ...createTransferActions(context),
   };
+  const actions = guardActions(rawActions, (error) => registerNotice(actionErrorMessage(error)));
 
   const dialogManager = createDialogManager({ onEscape: closeActiveDialog });
 
@@ -193,6 +196,19 @@ export function createBoardController(app) {
   function saveState() {
     workspace.boards[workspace.activeBoardId] = state;
     persistenceError = !persistWorkspace(workspace);
+  }
+
+  /** @param {import("./board.persistence.js").BoardWorkspace} nextWorkspace */
+  function replaceWorkspace(nextWorkspace) {
+    workspace.activeBoardId = nextWorkspace.activeBoardId;
+    workspace.boards = nextWorkspace.boards;
+    workspace.activeUserId = nextWorkspace.activeUserId;
+    workspace.users = nextWorkspace.users;
+    Object.keys(boardViewStates).forEach((id) => delete boardViewStates[id]);
+    state = workspace.boards[workspace.activeBoardId];
+    viewState = getBoardViewState(workspace.activeBoardId);
+    clearUndoTimer();
+    closeBoardAdministration();
   }
 
   function applyUserTheme() {

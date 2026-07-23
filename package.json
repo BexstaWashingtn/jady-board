@@ -8,6 +8,7 @@
     "test:e2e": "playwright test",
     "test:e2e:headed": "playwright test --headed",
     "test:coverage": "node --test --experimental-test-coverage",
+    "test:coverage:check": "node --test --experimental-test-coverage --test-coverage-lines=85 --test-coverage-branches=80 --test-coverage-functions=80",
     "typecheck": "tsc --project jsconfig.json"
   },
   "devDependencies": {
