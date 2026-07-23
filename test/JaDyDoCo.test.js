@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { afterEach, beforeEach, describe, mock, test } from "node:test";
 import { JSDOM } from "jsdom";
 
-import { JaDyDoCo, createApp } from "../src/core/JaDyDoCo.js";
+import { JADYDOCO_VERSION, JaDyDoCo, createApp } from "../src/core/JaDyDoCo.js";
 
 let dom;
 
@@ -23,6 +23,10 @@ afterEach(() => {
 });
 
 describe("constructor und createApp", () => {
+  test("weist die Core-Version explizit aus", () => {
+    assert.equal(JADYDOCO_VERSION, "2.0.0-alpha.1");
+  });
+
   test("constructor löst einen Selektor als Root auf", () => {
     const app = new JaDyDoCo("#root");
     assert.equal(app.root, document.querySelector("#root"));

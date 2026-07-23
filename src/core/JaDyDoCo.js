@@ -4,7 +4,11 @@
  * ---------------------------------------------------------
  *
  * Version:
- * 2.0.0-alpha
+ * 2.0.0-alpha.1
+ *
+ * Revision:
+ * Typed public node contracts, atomic tree rendering and safe text-only
+ * content handling distinguish this revision from the original 2.0.0-alpha.
  *
  * Author:
  * Thomas Badrow
@@ -99,6 +103,9 @@
 
 // @ts-nocheck -- Runtime implementation is intentionally dynamic; public JSDoc
 // types are verified independently in test-d/JaDyDoCo.types.js.
+
+/** Current semantic version of the JaDyDoCo core. */
+export const JADYDOCO_VERSION = "2.0.0-alpha.1";
 
 /**
  * A value accepted for ordinary HTML attributes.
