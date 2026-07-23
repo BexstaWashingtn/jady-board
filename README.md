@@ -67,6 +67,8 @@ Der aktive Benutzer wird automatisch Owner des neuen Boards.
 
 Aufgaben können vom Board-Owner oder ihrem Bearbeiter mit der Maus verschoben und neu sortiert werden. Aktive Filter deaktivieren das Drag-and-drop-Sortieren, weil dabei nicht alle Kartenpositionen sichtbar sind.
 
+Über die Reiter **Board** und **Liste** lässt sich pro Board zwischen dem visuellen Workflow und einer kompakten Tabellenansicht wechseln. Die Liste verwendet dieselben Filter, kann nach ID, Titel, Status, Priorität, Bearbeiter und Fälligkeit sortiert werden und öffnet beim Anklicken einer Zeile dieselbe Task-Arbeitsansicht.
+
 ### Stages konfigurieren
 
 Die Stage-Konfiguration ist nur für den Board-Owner verfügbar. Sie ermöglicht:

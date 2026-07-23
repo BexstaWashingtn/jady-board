@@ -116,6 +116,24 @@ describe("Board-Controller-Integration", () => {
     assert.ok(saved.users["user-demo-mara"]);
   });
 
+  test("wechselt in die filter- und sortierbare Listenansicht", () => {
+    startController();
+    findButton("Liste").click();
+
+    assert.ok(document.querySelector(".task-list-view"));
+    assert.equal(document.querySelectorAll(".task-table__row").length, 9);
+    findButton("Titel").click();
+    assert.match(document.querySelector(".task-table__sort--active")?.textContent ?? "", /Titel ↑/);
+
+    const search = document.querySelector('input[name="query"]');
+    assert.ok(search instanceof HTMLInputElement);
+    search.value = "KAN-18";
+    search.dispatchEvent(new dom.window.Event("input", { bubbles: true }));
+    assert.equal(document.querySelectorAll(".task-table__row").length, 1);
+    document.querySelector(".task-table__row")?.click();
+    assert.ok(document.querySelector(".task-work-form"));
+  });
+
   test("erstellt eine Aufgabe über den vollständigen Formularablauf und persistiert sie", () => {
     startController();
     findButton("+ Neue Aufgabe").click();
@@ -129,7 +147,7 @@ describe("Board-Controller-Integration", () => {
     submit(form);
 
     assert.equal(document.querySelector(".modal"), null);
-    assert.match(document.querySelector("#kanban-region")?.textContent ?? "", /Integrationstest schreiben/);
+    assert.match(document.querySelector("#board-content-region")?.textContent ?? "", /Integrationstest schreiben/);
 
     const saved = JSON.parse(localStorage.getItem(BOARD_STORAGE_KEY));
     const task = Object.values(saved.boards["board-1"].tasks)

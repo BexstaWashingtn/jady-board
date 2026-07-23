@@ -67,6 +67,22 @@
 [data-theme="dark"] .view-tab--active {
   color: #eceef1;
 }
+[data-theme="dark"] .task-list-view {
+  border-color: #30364a;
+  background: #1c2231;
+  box-shadow: 0 8px 24px rgba(2, 4, 10, 0.22);
+}
+[data-theme="dark"] .task-table th {
+  border-color: #30364a;
+  background: #191e2b;
+}
+[data-theme="dark"] .task-table td {
+  border-color: #2b3143;
+}
+[data-theme="dark"] .task-table__row:hover,
+[data-theme="dark"] .task-table__row:focus-visible {
+  background: rgba(139, 124, 246, 0.1);
+}
 [data-theme="dark"] .member-stack .member {
   border-color: #111521;
 }

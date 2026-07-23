@@ -10,6 +10,8 @@ test("Domain-State und flüchtiger Board-View-State sind getrennt", () => {
 
   assert.equal("ui" in state, false);
   assert.equal(viewState.createTaskColumnId, "backlog");
+  assert.equal(viewState.viewMode, "board");
+  assert.deepEqual(viewState.listSort, { key: "id", direction: "asc" });
   assert.deepEqual(viewState.filters, {
     query: "", priority: "all", category: "all", assigneeId: "all",
   });

@@ -16,6 +16,25 @@ test("startet mit einem nutzbaren Kanban-Board", async ({ page }) => {
   await expect(page.getByRole("button", { name: "+ Neue Aufgabe" })).toBeVisible();
 });
 
+test("wechselt zwischen Board und sortierbarer Task-Liste", async ({ page }) => {
+  await page.getByRole("tab", { name: "Liste" }).click();
+
+  const list = page.getByRole("region", { name: "Task-Liste" });
+  await expect(list).toBeVisible();
+  await expect(list.locator("tbody tr")).toHaveCount(9);
+  await list.getByRole("button", { name: "Titel" }).click();
+  await expect(list.getByRole("button", { name: "Titel ↑" })).toBeVisible();
+
+  await page.getByRole("searchbox", { name: "Aufgaben suchen" }).fill("KAN-18");
+  await expect(list.locator("tbody tr")).toHaveCount(1);
+  await list.locator("tbody tr").click();
+  await expect(page.getByRole("dialog", { name: /Leere Zustände/ })).toBeVisible();
+
+  await page.getByRole("button", { name: "Details schließen" }).click();
+  await page.getByRole("tab", { name: "Board" }).click();
+  await expect(page.getByRole("region", { name: "Kanban-Board" })).toBeVisible();
+});
+
 test("erstellt eine Aufgabe über den vollständigen Browser-Workflow", async ({ page }) => {
   await page.getByRole("button", { name: "+ Neue Aufgabe" }).click();
 

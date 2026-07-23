@@ -92,6 +92,12 @@
   .member-stack {
     margin-left: auto;
   }
+  .task-table__optional {
+    display: none;
+  }
+  .task-table__title {
+    min-width: 180px;
+  }
   .kanban {
     grid-auto-columns: 82vw;
   }

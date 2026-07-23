@@ -1,4 +1,4 @@
-import { createBoardPage, createKanbanBoard } from "../templates/board.map.js";
+import { createBoardContent, createBoardPage } from "../templates/board.map.js";
 import { createBoardActions } from "./actions/board.actions.js";
 import { createDragDropActions } from "./actions/drag-drop.actions.js";
 import { createFilterActions } from "./actions/filter.actions.js";
@@ -43,7 +43,7 @@ export function createBoardController(app) {
     overlays,
     interaction,
     render,
-    renderKanban,
+    renderBoardContent,
     renderUndoRegion,
     saveState,
     clearUndoTimer,
@@ -128,10 +128,10 @@ export function createBoardController(app) {
     dialogManager.afterRender();
   }
 
-  function renderKanban() {
-    const region = document.querySelector("#kanban-region");
+  function renderBoardContent() {
+    const region = document.querySelector("#board-content-region");
     if (!(region instanceof HTMLElement)) { render(); return; }
-    app.replace(createKanbanBoard(state, viewState, actions, Object.values(workspace.users), isBoardOwner(), workspace.activeUserId, canCreateTask(state, workspace.activeUserId)), region);
+    app.replace(createBoardContent(state, viewState, actions, Object.values(workspace.users), isBoardOwner(), workspace.activeUserId, canCreateTask(state, workspace.activeUserId)), region);
   }
 
   function renderUndoRegion() {

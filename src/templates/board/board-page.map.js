@@ -4,7 +4,7 @@ import { createNoticeSnackbar, createUndoSnackbar } from "../../features/feedbac
 import { createUserSettings } from "../../features/users/user-settings.map.js";
 import { createAppSettings } from "../../features/settings/app-settings.map.js";
 import { createBoardConfig, createStageConfig, createStageEditorDialog } from "./config.map.js";
-import { createKanbanBoard } from "./kanban.map.js";
+import { createBoardContent } from "./board-content.map.js";
 import { createBoardDialog, createTaskDetails, createTaskDialog } from "./dialogs.map.js";
 
 /**
@@ -176,9 +176,10 @@ export function createBoardPage(state, viewState, actions, workspace) {
                 {
                   tagName: "div",
                   class: "view-tabs",
+                  attrs: { role: "tablist", "aria-label": "Board-Ansicht" },
                   children: [
-                    { tagName: "button", type: "button", class: "view-tab view-tab--active", text: "Board" },
-                    { tagName: "button", type: "button", class: "view-tab", text: "Liste" },
+                    viewTab("board", "Board", viewState, actions),
+                    viewTab("list", "Liste", viewState, actions),
                   ],
                 },
                 boardMemberStack(state.project, workspace.users, actions, canConfigureBoard),
@@ -193,8 +194,9 @@ export function createBoardPage(state, viewState, actions, workspace) {
             },
             {
               tagName: "div",
-              id: "kanban-region",
-              children: [createKanbanBoard(state, viewState, actions, workspace.users, canConfigureBoard, workspace.activeUserId, canCreate)],
+              id: "board-content-region",
+              attrs: { role: "tabpanel" },
+              children: [createBoardContent(state, viewState, actions, workspace.users, canConfigureBoard, workspace.activeUserId, canCreate)],
             },
           ],
         },
@@ -221,6 +223,19 @@ export function createBoardPage(state, viewState, actions, workspace) {
     ...(workspace.userSettingsOpen ? [createUserSettings(workspace, actions)] : []),
     ...(workspace.appSettingsOpen ? [createAppSettings(workspace, actions)] : []),
   ],
+  };
+}
+
+/** @param {"board"|"list"} mode @param {string} label @param {import("../../board/board.view-state.js").BoardViewState} viewState @param {import("./board.types.js").BoardActions} actions @returns {import("../../core/JaDyDoCo.js").JaDyNode} */
+function viewTab(mode, label, viewState, actions) {
+  const active = viewState.viewMode === mode;
+  return {
+    tagName: "button",
+    type: "button",
+    class: ["view-tab", active && "view-tab--active"],
+    text: label,
+    attrs: { role: "tab", "aria-selected": String(active), tabindex: active ? "0" : "-1" },
+    events: { click: () => actions.setViewMode(mode) },
   };
 }
 
