@@ -1,5 +1,7 @@
 # JaDy Board
 
+**Live-Version:** [https://jady-board.vercel.app](https://jady-board.vercel.app)
+
 JaDy Board ist eine browserbasierte Kanban-Anwendung zur Organisation von Aufgaben, Arbeitsabläufen und kleinen Teams. Die Oberfläche wurde vollständig mit dem eigenen **JaDyDoCo-Framework** (JavaScript Dynamic DOM Constructor) umgesetzt und kommt ohne Frontend-Framework und ohne produktive Laufzeitabhängigkeiten aus.
 
 Das Projekt läuft vollständig im Browser. Boards, Aufgaben, Benutzerprofile und Einstellungen werden lokal im `localStorage` gespeichert.
@@ -92,7 +94,7 @@ Die Benutzerprofile sind lokale App-Profile und keine echten, serverseitig authe
 
 ## Installation und lokaler Start
 
-Voraussetzung ist eine aktuelle Node.js-Version. Empfohlen wird Node.js 20 oder neuer.
+Voraussetzung ist eine aktuelle Node.js-Version. Empfohlen wird Node.js 22 oder neuer (aufgrund von `--watch` und nativen Test-Runner-Features).
 
 ```bash
 git clone https://github.com/BexstaWashingtn/jady-board.git
