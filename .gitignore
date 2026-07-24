@@ -1,6 +1,28 @@
+# Dependencies
 node_modules/
+
+# Environment
 .env
+.env.*
+
+# Test
 coverage/
 playwright-report/
 test-results/
+
+# Logs
+*.log
 debug.log
+
+# Editor
+.vscode/
+
+# Scripts (optional)
+.scripts/
+
+# Build
+dist/
+.next/
+
+# ZIPs
+*.zip
