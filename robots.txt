@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://jady-board.vercel.app/sitemap.xml
