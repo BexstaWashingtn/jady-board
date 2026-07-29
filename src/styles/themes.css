@@ -1,6 +1,5 @@
 ﻿/* Dark-theme component refinements. Semantic defaults live in tokens.css. */
 
-
 [data-theme="dark"] .board-header h1,
 [data-theme="dark"] .column-header h2,
 [data-theme="dark"] .task-card h3,
@@ -186,10 +185,7 @@
   );
   box-shadow: inset 2px 0 #9b8df8;
 }
-[data-theme="dark"] .brand__mark {
-  background: linear-gradient(145deg, #a89cfb, #6757d9);
-  box-shadow: 0 7px 20px rgba(103, 87, 217, 0.35);
-}
+
 [data-theme="dark"] .task-card {
   border-color: #30364a;
   background: linear-gradient(155deg, #1c2231, #181d2a);
@@ -487,5 +483,3 @@
 [data-theme="dark"] .member-stack:not(button) {
   cursor: default;
 }
-
-

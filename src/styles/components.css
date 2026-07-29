@@ -26,12 +26,9 @@
 }
 .brand__mark {
   display: grid;
-  width: 32px;
-  height: 32px;
+  height: 42px;
   place-items: center;
-  border-radius: 9px;
   color: white;
-  background: linear-gradient(145deg, #8b7cf6, #6757d9);
   font-weight: 800;
 }
 .brand__name {
@@ -1910,8 +1907,3 @@
   font-size: 0.66rem;
   line-height: 1.4;
 }
-
-
-
-
-
