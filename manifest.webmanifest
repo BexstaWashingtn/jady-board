@@ -1,0 +1,29 @@
+{
+  "id": "/",
+  "name": "JaDy Board",
+  "short_name": "JaDy Board",
+  "description": "Kanban-Anwendung zur Organisation von Aufgaben, Boards und Workflows.",
+  "lang": "de",
+  "dir": "ltr",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f7f3f0",
+  "theme_color": "#711521",
+  "categories": ["productivity", "business"],
+  "icons": [
+    {
+      "src": "/public/img/app-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/public/img/app-icon-maskable.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}

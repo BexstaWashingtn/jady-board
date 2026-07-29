@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title">
+  <title id="title">JaDy Board</title>
+  <rect width="512" height="512" fill="#711521"/>
+  <g fill="#fff" opacity=".96">
+    <rect x="112" y="128" width="80" height="256" rx="18"/>
+    <rect x="216" y="128" width="80" height="160" rx="18"/>
+    <rect x="320" y="128" width="80" height="208" rx="18"/>
+  </g>
+  <g fill="#711521">
+    <rect x="130" y="158" width="44" height="10" rx="5"/>
+    <rect x="130" y="182" width="32" height="10" rx="5"/>
+    <rect x="234" y="158" width="44" height="10" rx="5"/>
+    <rect x="234" y="182" width="32" height="10" rx="5"/>
+    <rect x="338" y="158" width="44" height="10" rx="5"/>
+    <rect x="338" y="182" width="32" height="10" rx="5"/>
+  </g>
+</svg>
