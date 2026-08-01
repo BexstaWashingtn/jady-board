@@ -82,7 +82,7 @@ export function createBoardPage(state, viewState, actions, workspace) {
               {
                 tagName: "img",
                 class: "brand__mark",
-                src: "public/img/logo_white.svg",
+                src: "assets/img/logo_white.svg",
                 alt: "JaDy Board Logo",
               },
               { tagName: "strong", class: "brand__name", text: "JaDy Board" },

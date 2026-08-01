@@ -14,13 +14,13 @@
   "categories": ["productivity", "business"],
   "icons": [
     {
-      "src": "/public/img/app-icon.svg",
+      "src": "/assets/img/app-icon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any"
     },
     {
-      "src": "/public/img/app-icon-maskable.svg",
+      "src": "/assets/img/app-icon-maskable.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "maskable"
