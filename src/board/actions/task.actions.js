@@ -80,7 +80,7 @@ export function createTaskActions(context) {
     dismissNotice() { context.viewState().notice = null; context.clearUndoTimer(); context.renderUndoRegion(); },
 
     /** @param {Event} event */
-    submitCreateTask(event) {
+    async submitCreateTask(event) {
       event.preventDefault();
       if (!(event.currentTarget instanceof HTMLFormElement)) return;
       if (!canCreateTask(context.state(), context.workspace.activeUserId)) return;
@@ -89,7 +89,24 @@ export function createTaskActions(context) {
       const assigneeId = String(data.get("assigneeId") ?? "");
       const userId = context.workspace.activeUserId;
       const canSelectAssignee = context.isBoardOwner() || assigneeId === userId;
-      addTask(state, { title: data.get("title"), category: data.get("category"), priority: data.get("priority"), assigneeId: canSelectAssignee && state.project.memberIds.includes(assigneeId) ? assigneeId : null, dueDate: data.get("dueDate"), columnId: String(data.get("columnId") ?? "backlog") });
+      const columnId = String(data.get("columnId") ?? "backlog");
+      const created = addTask(state, { title: data.get("title"), category: data.get("category"), priority: data.get("priority"), assigneeId: canSelectAssignee && state.project.memberIds.includes(assigneeId) ? assigneeId : null, dueDate: data.get("dueDate"), columnId });
+      if (context.createTaskRemote) {
+        const temporaryId = created.id;
+        try {
+          const saved = await context.createTaskRemote(context.workspace.activeBoardId, created, columnId);
+          const column = state.columns.find(({ id }) => id === columnId);
+          const index = column?.taskIds.indexOf(temporaryId) ?? -1;
+          if (column && index >= 0) column.taskIds[index] = saved.id;
+          delete state.tasks[temporaryId];
+          state.tasks[saved.id] = { ...created, ...saved, id: saved.id };
+        } catch (error) {
+          const column = state.columns.find(({ id }) => id === columnId);
+          if (column) column.taskIds = column.taskIds.filter((id) => id !== temporaryId);
+          delete state.tasks[temporaryId];
+          throw error;
+        }
+      }
       context.viewState().createTaskOpen = false;
       context.saveState();
       context.render();

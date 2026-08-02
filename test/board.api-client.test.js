@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 
-import { loadApiWorkspace, moveApiTask, readApiDataSource, updateApiTask } from "../src/board/board.api-client.js";
+import { createApiTask, loadApiWorkspace, moveApiTask, readApiDataSource, updateApiTask } from "../src/board/board.api-client.js";
 
 describe("Board-API-Client", () => {
   test("aktiviert die API ausschließlich per URL-Opt-in", () => {
@@ -63,6 +63,17 @@ describe("Board-API-Client", () => {
     });
     assert.deepEqual(requestBody, { stageId: "done", targetIndex: 2, version: 1 });
     assert.deepEqual(moved, { id: "task-id", stageId: "done", position: 2, version: 2 });
+  });
+
+  test("erstellt Tasks und übernimmt die Serveridentität", async () => {
+    const draft = boardResponse().tasks["task-id"];
+    let requestBody;
+    const created = await createApiTask("http://api", "board-id", draft, "stage-id", async (_url, options) => {
+      requestBody = JSON.parse(options.body);
+      return response({ task: { ...draft, id: "server-task-id", version: 1 } }, 201);
+    });
+    assert.deepEqual(requestBody, { stageId: "stage-id", title: "API Task", category: "Test", priority: "medium", assigneeId: "user-id", dueDate: null });
+    assert.equal(created.id, "server-task-id");
   });
 });
 

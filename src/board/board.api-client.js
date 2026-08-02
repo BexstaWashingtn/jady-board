@@ -100,6 +100,31 @@ export async function moveApiTask(baseUrl, boardId, task, stageId, targetIndex, 
   return body.task;
 }
 
+/**
+ * @param {string} baseUrl
+ * @param {string} boardId
+ * @param {import("./board.state.js").BoardTask} task
+ * @param {string} stageId
+ * @param {typeof fetch} [request]
+ * @returns {Promise<import("./board.state.js").BoardTask>}
+ */
+export async function createApiTask(baseUrl, boardId, task, stageId, request = fetch) {
+  const response = await request(`${baseUrl}/api/boards/${encodeURIComponent(boardId)}/tasks`, {
+    method: "POST", headers: { Accept: "application/json", "Content-Type": "application/json" },
+    body: JSON.stringify({
+      stageId, title: task.title, category: task.category, priority: task.priority,
+      assigneeId: task.assigneeId, dueDate: task.dueDate,
+    }),
+  });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    if (body?.error?.code === "WIP_LIMIT_REACHED") throw new Error("Die Ziel-Stage hat ihr WIP-Limit erreicht.");
+    throw new Error(String(body?.error?.message ?? `Task konnte nicht erstellt werden (${response.status}).`));
+  }
+  if (!body.task?.id || Number(body.task.version) < 1) throw new Error("Die Board-API hat einen ungültigen Task zurückgegeben.");
+  return body.task;
+}
+
 /** @param {typeof fetch} request @param {string} url @returns {Promise<Record<string, any>>} */
 async function getJson(request, url) {
   const response = await request(url, { headers: { Accept: "application/json" } });

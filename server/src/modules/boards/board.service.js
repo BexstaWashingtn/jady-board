@@ -1,9 +1,12 @@
+import { randomUUID } from "node:crypto";
+
 /**
  * @typedef {Object} BoardService
  * @property {(userId: string) => Promise<Record<string, any>[]>} listBoards
  * @property {(boardId: string, userId: string) => Promise<Record<string, any>|null>} getBoard
  * @property {(boardId: string, taskId: string, userId: string, input: unknown) => Promise<{status: "updated", task: Record<string, any>}|{status: "not_found"|"forbidden"|"conflict"}|{status: "invalid", message: string}>} updateTask
  * @property {(boardId: string, taskId: string, userId: string, input: unknown) => Promise<{status: "moved", task: Record<string, any>}|{status: "not_found"|"forbidden"|"conflict"}|{status: "rejected", code: string, message: string}|{status: "invalid", message: string}>} moveTask
+ * @property {(boardId: string, userId: string, input: unknown) => Promise<{status: "created", task: Record<string, any>}|{status: "not_found"|"forbidden"}|{status: "rejected", code: string, message: string}|{status: "invalid", message: string}>} createTask
  */
 
 /**
@@ -66,7 +69,40 @@ export function createBoardService(repository) {
       if (!moved) return { status: "conflict" };
       return { status: "moved", task: { id: String(moved.id), stageId: String(moved.stage_id), position: Number(moved.position), version: Number(moved.version) } };
     },
+
+    async createTask(boardId, userId, input) {
+      const parsed = parseTaskCreate(input);
+      if ("message" in parsed) return { status: "invalid", message: parsed.message };
+      if (!repository.createTask) throw new Error("Task creation is unavailable.");
+      const result = await repository.createTask(boardId, userId, { id: randomUUID(), ...parsed });
+      if (result.status === "wip_limit") return { status: "rejected", code: "WIP_LIMIT_REACHED", message: "The target stage has reached its WIP limit." };
+      if (result.status === "not_found") return { status: "not_found" };
+      if (result.status === "forbidden") return { status: "forbidden" };
+      if (result.status !== "created") throw new Error("Unexpected task creation result.");
+      const row = result.task;
+      return { status: "created", task: {
+        id: String(row.id), key: `${row.task_prefix}-${row.task_number}`,
+        title: String(row.title), category: String(row.category), priority: String(row.priority),
+        comments: 0, todos: [], dueDate: row.due_date ? String(row.due_date) : null,
+        assigneeId: row.assignee_id ? String(row.assignee_id) : null, version: Number(row.version),
+        stageId: String(row.stage_id), position: Number(row.position),
+      } };
+    },
   };
+}
+
+/**
+ * @param {unknown} input
+ * @returns {{message: string}|{stageId: string, title: string, category: string, priority: string, assigneeId: string|null, dueDate: string|null}}
+ */
+function parseTaskCreate(input) {
+  if (!input || typeof input !== "object" || Array.isArray(input)) return { message: "A JSON object is required." };
+  const value = /** @type {Record<string, unknown>} */ (input);
+  const common = parseTaskUpdate({ ...value, dueDate: value.dueDate ?? null, version: 1 });
+  if ("message" in common) return common;
+  if (typeof value.stageId !== "string" || !value.stageId.trim()) return { message: "Target stage is required." };
+  if (value.assigneeId !== null && value.assigneeId !== undefined && typeof value.assigneeId !== "string") return { message: "Task assignee is invalid." };
+  return { stageId: value.stageId, title: common.title, category: common.category, priority: common.priority, dueDate: common.dueDate, assigneeId: typeof value.assigneeId === "string" && value.assigneeId ? value.assigneeId : null };
 }
 
 /**

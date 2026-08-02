@@ -511,6 +511,32 @@ describe("Board-Controller-Integration", () => {
     controller.destroy();
   });
 
+  test("ersetzt einen temporären Task im API-Modus durch die Serveridentität", async () => {
+    const state = createInitialBoardState();
+    const workspace = {
+      activeBoardId: "api-board", boards: { "api-board": state }, activeUserId: "user-1",
+      users: { "user-1": { id: "user-1", name: "API User", initials: "AU", preferences: { theme: /** @type {const} */ ("system") } } },
+    };
+    let temporaryId = "";
+    const controller = createBoardController(createApp("#root"), {
+      workspace, persist: () => true, seedShowcase: false,
+      async createTaskRemote(_boardId, task) {
+        temporaryId = task.id;
+        return { ...task, id: "912e8124-aa18-5848-bac7-3486be614b78", version: 1 };
+      },
+    });
+    controller.actions.openCreateTask("backlog");
+    const form = document.querySelector(".task-form");
+    assert.ok(form instanceof HTMLFormElement);
+    form.elements.namedItem("title").value = "Server Task";
+
+    await controller.actions.submitCreateTask({ preventDefault() {}, currentTarget: form });
+
+    assert.equal(controller.getState().tasks[temporaryId], undefined);
+    assert.equal(controller.getState().tasks["912e8124-aa18-5848-bac7-3486be614b78"].title, "Server Task");
+    assert.ok(controller.getState().columns[0].taskIds.includes("912e8124-aa18-5848-bac7-3486be614b78"));
+  });
+
   test("erlaubt Mitgliedern freie Tasks zu übernehmen und wieder freizugeben", () => {
     const controller = startController();
     controller.actions.switchUser("user-demo-lukas");

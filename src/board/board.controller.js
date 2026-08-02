@@ -15,7 +15,7 @@ import { createBoardViewState } from "./board.view-state.js";
 
 /**
  * @param {import("../core/JaDyDoCo.js").JaDyDoCo} app
- * @param {{workspace?: import("./board.persistence.js").BoardWorkspace, persist?: typeof persistWorkspace, seedShowcase?: boolean, updateTaskRemote?: (boardId: string, task: import("./board.state.js").BoardTask) => Promise<Partial<import("./board.state.js").BoardTask>>, moveTaskRemote?: (boardId: string, task: import("./board.state.js").BoardTask, stageId: string, targetIndex: number) => Promise<{version: number}>}} [options]
+ * @param {{workspace?: import("./board.persistence.js").BoardWorkspace, persist?: typeof persistWorkspace, seedShowcase?: boolean, updateTaskRemote?: (boardId: string, task: import("./board.state.js").BoardTask) => Promise<Partial<import("./board.state.js").BoardTask>>, moveTaskRemote?: (boardId: string, task: import("./board.state.js").BoardTask, stageId: string, targetIndex: number) => Promise<{version: number}>, createTaskRemote?: (boardId: string, task: import("./board.state.js").BoardTask, stageId: string) => Promise<import("./board.state.js").BoardTask>}} [options]
  */
 export function createBoardController(app, options = {}) {
   const workspace = options.workspace ?? loadWorkspace();
@@ -64,6 +64,7 @@ export function createBoardController(app, options = {}) {
     replaceWorkspace,
     updateTaskRemote: options.updateTaskRemote,
     moveTaskRemote: options.moveTaskRemote,
+    createTaskRemote: options.createTaskRemote,
   };
 
   const rawActions = {

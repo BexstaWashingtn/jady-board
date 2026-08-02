@@ -193,6 +193,25 @@ describe("Task-Schreib-API", () => {
     assert.equal(limited.status, 422);
     assert.equal((await limited.json()).error.code, "WIP_LIMIT_REACHED");
   });
+
+  test("erstellt Tasks über einen stabilen HTTP-Vertrag", async () => {
+    let received;
+    const createdTask = { id: taskId, title: "Neu", version: 1 };
+    const boardService = {
+      async listBoards() { return []; }, async getBoard() { return null; },
+      async updateTask() { return { status: /** @type {const} */ ("not_found") }; },
+      async moveTask() { return { status: /** @type {const} */ ("not_found") }; },
+      async createTask(board, user, body) { received = [board, user, body]; return { status: /** @type {const} */ ("created"), task: createdTask }; },
+    };
+    const baseUrl = await listenApi({ boardService, currentUserId: userId });
+    const body = { stageId: "c358d08d-6fdd-5752-8fe2-a4004c0e5ad9", title: "Neu", category: "Core", priority: "medium", assigneeId: null, dueDate: null };
+    const response = await fetch(`${baseUrl}/api/boards/${boardId}/tasks`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+    });
+    assert.equal(response.status, 201);
+    assert.deepEqual(await response.json(), { task: createdTask });
+    assert.deepEqual(received, [boardId, userId, body]);
+  });
 });
 
 /**

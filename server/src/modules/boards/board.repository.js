@@ -6,6 +6,7 @@
  * @property {(boardId: string, taskId: string, version: number, changes: {title: string, category: string, priority: string, dueDate: string|null}) => Promise<Record<string, any>|null>} [updateTaskMetadata]
  * @property {(boardId: string, taskId: string, userId: string, targetStageId: string) => Promise<Record<string, any>|null>} [findTaskMoveContext]
  * @property {(boardId: string, taskId: string, targetStageId: string, targetIndex: number, version: number) => Promise<Record<string, any>|null>} [moveTask]
+ * @property {(boardId: string, userId: string, input: {id: string, stageId: string, title: string, category: string, priority: string, assigneeId: string|null, dueDate: string|null}) => Promise<{status: "created", task: Record<string, any>}|{status: "not_found"|"forbidden"|"wip_limit"}>} [createTask]
  */
 
 /**
@@ -151,6 +152,50 @@ export function createBoardRepository(database) {
         await client.query(`UPDATE boards SET version = version + 1, updated_at = now() WHERE id = $1`, [boardId]);
         await client.query("COMMIT");
         return result.rows[0] ?? null;
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      } finally {
+        client.release();
+      }
+    },
+
+    async createTask(boardId, userId, input) {
+      if (!("connect" in database) || typeof database.connect !== "function") throw new Error("Transactions are unavailable.");
+      const client = await database.connect();
+      try {
+        await client.query("BEGIN");
+        const contextResult = await client.query(`
+          SELECT b.next_task_number, b.task_prefix, bm.role,
+            s.wip_limit, s.wip_limit_mode,
+            (SELECT count(*)::int FROM tasks t WHERE t.stage_id = s.id) AS task_count
+          FROM boards b
+          JOIN board_members bm ON bm.board_id = b.id AND bm.user_id = $2
+          JOIN stages s ON s.board_id = b.id AND s.id = $3
+          WHERE b.id = $1
+          FOR UPDATE OF b, s
+        `, [boardId, userId, input.stageId]);
+        const context = contextResult.rows[0];
+        if (!context) { await client.query("ROLLBACK"); return { status: "not_found" }; }
+        if (input.assigneeId) {
+          const member = await client.query(`SELECT 1 FROM board_members WHERE board_id = $1 AND user_id = $2`, [boardId, input.assigneeId]);
+          if (!member.rowCount || (context.role !== "owner" && input.assigneeId !== userId)) {
+            await client.query("ROLLBACK"); return { status: "forbidden" };
+          }
+        }
+        if (context.wip_limit_mode === "strict" && context.wip_limit !== null && Number(context.task_count) >= Number(context.wip_limit)) {
+          await client.query("ROLLBACK"); return { status: "wip_limit" };
+        }
+        const taskNumber = Number(context.next_task_number);
+        const result = await client.query(`
+          INSERT INTO tasks
+            (id, board_id, stage_id, task_number, title, category, priority, assignee_id, due_date, position)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+          RETURNING id, stage_id, task_number, title, category, priority, assignee_id, due_date::text, position, version
+        `, [input.id, boardId, input.stageId, taskNumber, input.title, input.category, input.priority, input.assigneeId, input.dueDate, Number(context.task_count)]);
+        await client.query(`UPDATE boards SET next_task_number = next_task_number + 1, version = version + 1, updated_at = now() WHERE id = $1`, [boardId]);
+        await client.query("COMMIT");
+        return { status: "created", task: { ...result.rows[0], task_prefix: context.task_prefix } };
       } catch (error) {
         await client.query("ROLLBACK");
         throw error;

@@ -2,7 +2,7 @@ const JSON_HEADERS = {
   "Content-Type": "application/json; charset=utf-8",
   "Cache-Control": "no-store",
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, PATCH, OPTIONS",
+  "Access-Control-Allow-Methods": "GET, POST, PATCH, OPTIONS",
   "Access-Control-Allow-Headers": "Accept, Content-Type",
 };
 
@@ -79,6 +79,28 @@ export function createApiHandler({ database, boardService, currentUserId = null 
         return;
       }
       sendJson(response, 200, { board });
+      return;
+    }
+
+    const createTaskMatch = method === "POST" ? url.pathname.match(/^\/api\/boards\/([^/]+)\/tasks$/) : null;
+    if (createTaskMatch) {
+      if (!boardService || !currentUserId) { sendJson(response, 503, identityUnavailable()); return; }
+      const boardId = decodeURIComponent(createTaskMatch[1]);
+      if (!isUuid(boardId)) { sendJson(response, 400, { error: { code: "INVALID_BOARD_ID", message: "Board ID must be a UUID." } }); return; }
+      let body;
+      try { body = await readJson(request); } catch {
+        sendJson(response, 400, { error: { code: "INVALID_JSON", message: "A valid JSON request body is required." } }); return;
+      }
+      try {
+        const result = await boardService.createTask(boardId, currentUserId, body);
+        if (result.status === "created") sendJson(response, 201, { task: result.task });
+        else if (result.status === "invalid") sendJson(response, 400, { error: { code: "INVALID_TASK", message: result.message } });
+        else if (result.status === "forbidden") sendJson(response, 403, { error: { code: "TASK_CREATE_FORBIDDEN", message: "Task creation is not permitted." } });
+        else if (result.status === "rejected") sendJson(response, 422, { error: { code: result.code, message: result.message } });
+        else sendJson(response, 404, { error: { code: "BOARD_OR_STAGE_NOT_FOUND", message: "Board or target stage not found." } });
+      } catch {
+        sendJson(response, 500, internalError());
+      }
       return;
     }
 

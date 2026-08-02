@@ -115,6 +115,30 @@ describe("Board-Service", () => {
     context.require_completed_todos = false; context.open_todo_count = 0; context.wip_limit = 1; context.wip_limit_mode = "strict"; context.target_count = 1;
     assert.equal((await service.moveTask(BOARD_ID, TASK_ID, USER_ID, input)).status, "rejected");
   });
+
+  test("erstellt normalisierte Tasks mit serverseitiger UUID und Tasknummer", async () => {
+    let received;
+    const service = createBoardService({
+      async listForUser() { return []; }, async findForUser() { return null; },
+      async createTask(boardId, userId, input) {
+        received = { boardId, userId, input };
+        return { status: /** @type {const} */ ("created"), task: { ...input, task_prefix: "KAN", task_number: 19, stage_id: input.stageId, due_date: input.dueDate, assignee_id: input.assigneeId, position: 2, version: 1 } };
+      },
+    });
+    const result = await service.createTask(BOARD_ID, USER_ID, { stageId: STAGE_ID, title: " Neu ", category: "Core", priority: "high", assigneeId: USER_ID, dueDate: null });
+    assert.match(received.input.id, /^[0-9a-f-]{36}$/);
+    assert.equal(result.status === "created" && result.task.key, "KAN-19");
+    assert.equal(result.status === "created" && result.task.title, "Neu");
+  });
+
+  test("übersetzt ein hartes WIP-Limit beim Erstellen", async () => {
+    const service = createBoardService({
+      async listForUser() { return []; }, async findForUser() { return null; },
+      async createTask() { return { status: /** @type {const} */ ("wip_limit") }; },
+    });
+    const result = await service.createTask(BOARD_ID, USER_ID, { stageId: STAGE_ID, title: "Neu", category: "Core", priority: "medium" });
+    assert.deepEqual(result, { status: "rejected", code: "WIP_LIMIT_REACHED", message: "The target stage has reached its WIP limit." });
+  });
 });
 
 const USER_ID = "8acf3017-cf6e-589b-bd47-a1d8ccec16a8";

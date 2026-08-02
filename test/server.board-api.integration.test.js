@@ -108,6 +108,23 @@ test("verschiebt einen Task transaktional in PostgreSQL", { skip: !database }, a
   assert.equal(refreshed.columns[0].taskIds.includes(task.id), false);
 });
 
+test("erstellt einen Task mit atomarer Servernummer in PostgreSQL", { skip: !database }, async () => {
+  const board = (await (await fetch(`${baseUrl}/api/boards/${boardId}`)).json()).board;
+  const stage = board.columns[0];
+  const response = await fetch(`${baseUrl}/api/boards/${boardId}/tasks`, {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ stageId: stage.id, title: "Serverseitig erstellt", category: "Integration", priority: "high", assigneeId: userId, dueDate: null }),
+  });
+  assert.equal(response.status, 201);
+  const task = (await response.json()).task;
+  assert.match(task.id, /^[0-9a-f-]{36}$/);
+  assert.equal(task.key, "API-12");
+  assert.equal(task.version, 1);
+
+  const refreshed = (await (await fetch(`${baseUrl}/api/boards/${boardId}`)).json()).board;
+  assert.ok(refreshed.columns[0].taskIds.includes(task.id));
+});
+
 async function cleanup() {
   if (!database) return;
   await database.query("DELETE FROM workspace_imports WHERE fingerprint = $1", [plan.fingerprint]);
