@@ -4,13 +4,17 @@ import { pathToFileURL } from "node:url";
 import { loadConfig } from "./config.js";
 import { createDatabase } from "./db/database.js";
 import { createApiHandler } from "./http/app.js";
+import { createBoardRepository } from "./modules/boards/board.repository.js";
+import { createBoardService } from "./modules/boards/board.service.js";
 
 /**
  * @param {ReturnType<typeof loadConfig>} config
  */
 export function createJaDyServer(config) {
   const database = createDatabase(config);
-  const server = createServer(createApiHandler({ database }));
+  const boardRepository = createBoardRepository(database);
+  const boardService = createBoardService(boardRepository);
+  const server = createServer(createApiHandler({ database, boardService, currentUserId: config.devUserId }));
 
   async function close() {
     if (server.listening) {

@@ -6,6 +6,7 @@ const DEFAULT_PORT = 3000;
  * @property {number} port
  * @property {string} databaseUrl
  * @property {boolean} databaseSsl
+ * @property {string|null} devUserId
  */
 
 /**
@@ -25,10 +26,16 @@ export function loadConfig(environment = process.env) {
     throw new Error("DATABASE_URL is required.");
   }
 
+  const devUserId = environment.DEV_USER_ID?.trim() || null;
+  if (devUserId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(devUserId)) {
+    throw new Error("DEV_USER_ID must be a UUID.");
+  }
+
   return {
     host: environment.SERVER_HOST?.trim() || "127.0.0.1",
     port,
     databaseUrl,
     databaseSsl: environment.DATABASE_SSL === "true",
+    devUserId,
   };
 }

@@ -204,7 +204,7 @@ Die Anwendung setzt moderne Browser-APIs voraus, insbesondere ES-Module, `struct
 
 ## Server und PostgreSQL
 
-Die Servermigration wird parallel zum weiterhin funktionsfähigen Local-first-Client aufgebaut. Die erste Ausbaustufe enthält einen Node.js-HTTP-Server, PostgreSQL-Migrationen und getrennte Liveness- und Readiness-Endpunkte. Board-Daten werden noch nicht aus der API geladen.
+Die Servermigration wird parallel zum weiterhin funktionsfähigen Local-first-Client aufgebaut. Der Node.js-HTTP-Server stellt Liveness, Readiness und eine erste lesende Board-API bereit. Der Browser-Client arbeitet bis zur folgenden Integrationsstufe weiterhin mit seinem lokalen Workspace.
 
 ### Lokale Datenbank starten
 
@@ -231,6 +231,10 @@ Die API verwendet standardmäßig Port `3000`:
 
 - `GET /api/health` prüft, ob der Node.js-Prozess antwortet.
 - `GET /api/ready` prüft zusätzlich die PostgreSQL-Verbindung.
+- `GET /api/boards` listet die Boards des mit `DEV_USER_ID` konfigurierten Entwicklungsbenutzers.
+- `GET /api/boards/:id` liefert ein zugängliches Board einschließlich Mitglieder, Spalten, Tasks, Todos und Übergänge.
+
+`DEV_USER_ID` ist eine vorübergehende Entwicklungsidentität und muss der UUID eines importierten Benutzers entsprechen. Sie ersetzt keine spätere Authentifizierung.
 
 ### Bestehenden Workspace prüfen und importieren
 
@@ -257,8 +261,8 @@ Das initiale relationale Schema trennt Benutzer, Präferenzen, Boards, Mitgliede
 
 ## Aktuelle Grenzen
 
-- Daten werden ausschließlich lokal im aktuellen Browser gespeichert.
-- Es gibt keine Anmeldung, Zugriffskontrolle oder Mehrgeräte-Synchronisierung.
+- Der Browser-Client liest und schreibt weiterhin seinen lokalen Workspace; die neue Board-API ist noch nicht angebunden.
+- Es gibt noch keine Anmeldung; die lesende API begrenzt den Zugriff vorläufig über `DEV_USER_ID`.
 - Gleichzeitige Bearbeitung durch mehrere Personen wird nicht unterstützt.
 - Automatische oder zeitgesteuerte Backups sind nicht vorhanden; Exporte müssen manuell ausgelöst werden.
 - Benutzerprofile simulieren Teamrollen nur innerhalb des lokalen Workspace.
