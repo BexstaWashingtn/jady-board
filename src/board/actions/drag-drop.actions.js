@@ -60,17 +60,34 @@ export function createDragDropActions(context) {
       if (!canMoveTaskTo(state, taskId, columnId)) { context.registerNotice(context.moveRejectionMessage(taskId, columnId)); return; }
       if (!canAcceptTasks(state, columnId, 1, taskId)) return;
       const undo = createMoveUndo(state, taskId);
+      const previousColumns = context.moveTaskRemote ? structuredClone(state.columns) : null;
       const moved = moveTask(state, taskId, columnId, Number.isInteger(targetIndex) ? targetIndex : undefined);
       if (!moved) {
         viewState.draggingTaskId = null;
         context.interaction.taskOpenUntil = Date.now() + 180;
         return;
       }
-      context.registerUndo(undo, `${taskId} nach „${context.columnTitle(columnId)}“ verschoben.`);
+      if (!context.moveTaskRemote) context.registerUndo(undo, `${taskId} nach „${context.columnTitle(columnId)}“ verschoben.`);
       viewState.draggingTaskId = null;
       context.interaction.taskOpenUntil = Date.now() + 180;
-      context.saveState();
-      context.render();
+      const finish = () => {
+        context.saveState();
+        context.render();
+      };
+      if (context.moveTaskRemote) {
+        const targetPosition = state.columns.find(({ id }) => id === columnId)?.taskIds.indexOf(taskId) ?? 0;
+        return context.moveTaskRemote(context.workspace.activeBoardId, state.tasks[taskId], columnId, targetPosition)
+          .then((saved) => {
+            state.tasks[taskId].version = saved.version;
+            context.registerNotice(`${taskId} wurde nach „${context.columnTitle(columnId)}“ verschoben.`);
+            finish();
+          })
+          .catch((error) => {
+            if (previousColumns) state.columns = previousColumns;
+            throw error;
+          });
+      }
+      finish();
     },
   };
 }

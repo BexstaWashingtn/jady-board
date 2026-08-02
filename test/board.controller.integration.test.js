@@ -597,6 +597,27 @@ describe("Board-Controller-Integration", () => {
     controller.destroy();
   });
 
+  test("persistiert Drag-and-drop im API-Modus ohne lokales Undo", async () => {
+    const state = createInitialBoardState();
+    state.tasks["KAN-18"].version = 2;
+    let received;
+    const workspace = {
+      activeBoardId: "api-board", boards: { "api-board": state }, activeUserId: "user-1",
+      users: { "user-1": { id: "user-1", name: "API User", initials: "AU", preferences: { theme: /** @type {const} */ ("system") } } },
+    };
+    const controller = createBoardController(createApp("#root"), {
+      workspace, persist: () => true, seedShowcase: false,
+      async moveTaskRemote(_boardId, task, stageId, targetIndex) { received = { version: task.version, stageId, targetIndex }; return { version: 3 }; },
+    });
+    const transfer = dragTransfer();
+    controller.actions.startTaskDrag(dragEvent(taskCard("KAN-18"), transfer), "KAN-18");
+    await controller.actions.dropTask(dragEvent(column("progress"), transfer), "progress");
+    assert.deepEqual(received, { version: 2, stageId: "progress", targetIndex: 2 });
+    assert.equal(controller.getState().tasks["KAN-18"].version, 3);
+    assert.equal(document.querySelector(".undo-toast"), null);
+    controller.destroy();
+  });
+
   test("erlaubt Mitgliedern freie Tasks zu übernehmen und wieder freizugeben", () => {
     const controller = startController();
     controller.actions.switchUser("user-demo-lukas");
