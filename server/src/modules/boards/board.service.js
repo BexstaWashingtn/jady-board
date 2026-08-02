@@ -10,6 +10,7 @@ import { randomUUID } from "node:crypto";
  * @property {(boardId: string, taskId: string, userId: string, input: unknown) => Promise<{status: "updated", task: Record<string, any>}|{status: "not_found"|"forbidden"|"conflict"}|{status: "invalid", message: string}>} assignTask
  * @property {(boardId: string, taskId: string, userId: string, input: unknown) => Promise<{status: "updated", task: Record<string, any>}|{status: "not_found"|"forbidden"|"conflict"}|{status: "invalid", message: string}>} syncTaskTodos
  * @property {(boardId: string, taskId: string, userId: string, version: unknown) => Promise<{status: "deleted"|"not_found"|"forbidden"|"conflict"}|{status: "invalid", message: string}>} deleteTask
+ * @property {(boardId: string, stageId: string, userId: string, input: unknown) => Promise<{status: "updated", stage: Record<string, any>}|{status: "not_found"|"forbidden"|"conflict"}|{status: "invalid", message: string}>} updateStage
  */
 
 /**
@@ -135,7 +136,38 @@ export function createBoardService(repository) {
       if (Number(current.version) !== parsedVersion) return { status: "conflict" };
       return await repository.deleteTask(boardId, taskId, parsedVersion) ? { status: "deleted" } : { status: "conflict" };
     },
+
+    async updateStage(boardId, stageId, userId, input) {
+      const parsed = parseStageUpdate(input, stageId);
+      if ("message" in parsed) return { status: "invalid", message: parsed.message };
+      if (!repository.findStageForUser || !repository.updateStage) throw new Error("Stage writes are unavailable.");
+      const current = await repository.findStageForUser(boardId, stageId, userId);
+      if (!current) return { status: "not_found" };
+      if (current.role !== "owner") return { status: "forbidden" };
+      if (Number(current.version) !== parsed.version) return { status: "conflict" };
+      const row = await repository.updateStage(boardId, stageId, parsed.version, parsed);
+      if (!row) return { status: "conflict" };
+      return { status: "updated", stage: { id: String(row.id), title: String(row.title), color: String(row.color), kind: String(row.kind), limit: row.wip_limit === null ? null : Number(row.wip_limit), limitMode: String(row.wip_limit_mode), requireCompletedTodos: Boolean(row.require_completed_todos), allowedTargetIds: row.allowed_target_ids, version: Number(row.version) } };
+    },
   };
+}
+
+/**
+ * @param {unknown} input @param {string} stageId
+ * @returns {{message: string}|{title: string, color: string, kind: string, limit: number|null, limitMode: string, allowedTargetIds: string[]|null, requireCompletedTodos: boolean, version: number}}
+ */
+function parseStageUpdate(input, stageId) {
+  if (!input || typeof input !== "object" || Array.isArray(input)) return { message: "A JSON object is required." };
+  const value = /** @type {Record<string, unknown>} */ (input);
+  const title = typeof value.title === "string" ? value.title.trim() : "";
+  const limit = value.limit === null || value.limit === "" ? null : Number(value.limit);
+  const targets = value.allowedTargetIds === null ? null : value.allowedTargetIds;
+  if (!title || typeof value.color !== "string" || !/^#[0-9a-f]{6}$/i.test(value.color)) return { message: "Stage title or color is invalid." };
+  if (!["backlog", "active", "review", "done"].includes(String(value.kind)) || !["warning", "strict"].includes(String(value.limitMode))) return { message: "Stage kind or limit mode is invalid." };
+  if (limit !== null && (!Number.isInteger(limit) || limit < 1)) return { message: "Stage limit is invalid." };
+  if (targets !== null && (!Array.isArray(targets) || targets.some((id) => typeof id !== "string" || id === stageId))) return { message: "Stage transitions are invalid." };
+  if (typeof value.requireCompletedTodos !== "boolean" || !Number.isInteger(value.version) || Number(value.version) < 1) return { message: "Stage settings or version are invalid." };
+  return { title, color: value.color, kind: String(value.kind), limit, limitMode: String(value.limitMode), allowedTargetIds: targets, requireCompletedTodos: value.requireCompletedTodos, version: Number(value.version) };
 }
 
 /**

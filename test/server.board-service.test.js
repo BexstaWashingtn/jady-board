@@ -188,6 +188,20 @@ describe("Board-Service", () => {
     repository.findTaskForUser = async () => ({ id: TASK_ID, version: 2, role: "member" });
     assert.equal((await service.deleteTask(BOARD_ID, TASK_ID, USER_ID, 2)).status, "forbidden");
   });
+
+  test("aktualisiert Stage-Regeln ausschließlich versioniert als Owner", async () => {
+    let received;
+    const service = createBoardService({
+      async listForUser() { return []; }, async findForUser() { return null; },
+      async findStageForUser() { return { id: STAGE_ID, version: 2, role: "owner" }; },
+      async updateStage(...args) { received = args; return { id: STAGE_ID, title: "Review", color: "#336699", kind: "review", wip_limit: 2, wip_limit_mode: "strict", require_completed_todos: true, allowed_target_ids: [TARGET_STAGE_ID], version: 3 }; },
+    });
+    const input = { title: "Review", color: "#336699", kind: "review", limit: 2, limitMode: "strict", allowedTargetIds: [TARGET_STAGE_ID], requireCompletedTodos: true, version: 2 };
+    const result = await service.updateStage(BOARD_ID, STAGE_ID, USER_ID, input);
+    assert.equal(received[2], 2);
+    assert.deepEqual(result.status === "updated" && result.stage.allowedTargetIds, [TARGET_STAGE_ID]);
+    assert.equal(result.status === "updated" && result.stage.version, 3);
+  });
 });
 
 const USER_ID = "8acf3017-cf6e-589b-bd47-a1d8ccec16a8";

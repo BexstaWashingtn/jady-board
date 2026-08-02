@@ -11,6 +11,8 @@
  * @property {(boardId: string, taskId: string, version: number, assigneeId: string|null) => Promise<Record<string, any>|null>} [updateTaskAssignment]
  * @property {(boardId: string, taskId: string, version: number, todos: {id: string, text: string, completed: boolean}[]) => Promise<Record<string, any>|null>} [replaceTaskTodos]
  * @property {(boardId: string, taskId: string, version: number) => Promise<boolean>} [deleteTask]
+ * @property {(boardId: string, stageId: string, userId: string) => Promise<Record<string, any>|null>} [findStageForUser]
+ * @property {(boardId: string, stageId: string, version: number, input: Record<string, any>) => Promise<Record<string, any>|null>} [updateStage]
  */
 
 /**
@@ -259,6 +261,34 @@ export function createBoardRepository(database) {
         await client.query("ROLLBACK");
         throw error;
       } finally { client.release(); }
+    },
+
+    async findStageForUser(boardId, stageId, userId) {
+      const result = await database.query(`SELECT s.id, s.version, bm.role FROM stages s JOIN board_members bm ON bm.board_id = s.board_id AND bm.user_id = $3 WHERE s.board_id = $1 AND s.id = $2`, [boardId, stageId, userId]);
+      return result.rows[0] ?? null;
+    },
+
+    async updateStage(boardId, stageId, version, input) {
+      if (!("connect" in database) || typeof database.connect !== "function") throw new Error("Transactions are unavailable.");
+      const client = await database.connect();
+      try {
+        await client.query("BEGIN");
+        const updated = await client.query(`
+          UPDATE stages SET title = $4, color = $5, kind = $6, wip_limit = $7,
+            wip_limit_mode = $8, require_completed_todos = $9,
+            transitions_restricted = $10, version = version + 1, updated_at = now()
+          WHERE board_id = $1 AND id = $2 AND version = $3
+          RETURNING id, title, color, kind, wip_limit, wip_limit_mode, require_completed_todos, version
+        `, [boardId, stageId, version, input.title, input.color, input.kind, input.limit, input.limitMode, input.requireCompletedTodos, input.allowedTargetIds !== null]);
+        if (!updated.rowCount) { await client.query("ROLLBACK"); return null; }
+        await client.query(`DELETE FROM stage_transitions WHERE board_id = $1 AND source_stage_id = $2`, [boardId, stageId]);
+        for (const targetId of input.allowedTargetIds ?? []) {
+          await client.query(`INSERT INTO stage_transitions (board_id, source_stage_id, target_stage_id) SELECT $1, $2, id FROM stages WHERE board_id = $1 AND id = $3`, [boardId, stageId, targetId]);
+        }
+        await client.query(`UPDATE boards SET version = version + 1, updated_at = now() WHERE id = $1`, [boardId]);
+        await client.query("COMMIT");
+        return { ...updated.rows[0], allowed_target_ids: input.allowedTargetIds };
+      } catch (error) { await client.query("ROLLBACK"); throw error; } finally { client.release(); }
     },
   };
 }
