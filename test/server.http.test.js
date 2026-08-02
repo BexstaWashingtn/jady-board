@@ -86,7 +86,7 @@ describe("Board-Lese-API", () => {
     const response = await fetch(`${baseUrl}/api/boards`);
 
     assert.equal(response.status, 200);
-    assert.deepEqual(await response.json(), { boards: [{ id: boardId, name: "Board" }] });
+    assert.deepEqual(await response.json(), { currentUserId: userId, boards: [{ id: boardId, name: "Board" }] });
     assert.equal(receivedUserId, userId);
   });
 

@@ -236,6 +236,14 @@ Die API verwendet standardmäßig Port `3000`:
 
 `DEV_USER_ID` ist eine vorübergehende Entwicklungsidentität und muss der UUID eines importierten Benutzers entsprechen. Sie ersetzt keine spätere Authentifizierung.
 
+Der Browser bleibt standardmäßig Local-first. Die lesende API-Anbindung kann für die Migration explizit aktiviert werden:
+
+```text
+http://127.0.0.1:4173/?data-source=api&api-url=http://127.0.0.1:3000
+```
+
+Der Client lädt dann die zugänglichen Boards aus PostgreSQL. Änderungen sind in diesem Zwischenstand nur im Arbeitsspeicher sichtbar und werden nicht an den Server geschrieben; ein Neuladen stellt deshalb den Datenbankstand wieder her. Ist die API beim Start nicht erreichbar, verwendet der Client weiterhin den lokalen Workspace.
+
 ### Bestehenden Workspace prüfen und importieren
 
 Ein vom Local-first-Client exportiertes JaDy-Board-Backup kann zunächst ohne

@@ -13,10 +13,14 @@ import { canConfigureBoard, canCreateTask } from "./board.permissions.js";
 import { loadWorkspace, persistWorkspace } from "./board.persistence.js";
 import { createBoardViewState } from "./board.view-state.js";
 
-/** @param {import("../core/JaDyDoCo.js").JaDyDoCo} app */
-export function createBoardController(app) {
-  const workspace = loadWorkspace();
-  let persistenceError = ensureShowcaseData(workspace) && !persistWorkspace(workspace);
+/**
+ * @param {import("../core/JaDyDoCo.js").JaDyDoCo} app
+ * @param {{workspace?: import("./board.persistence.js").BoardWorkspace, persist?: typeof persistWorkspace, seedShowcase?: boolean}} [options]
+ */
+export function createBoardController(app, options = {}) {
+  const workspace = options.workspace ?? loadWorkspace();
+  const persist = options.persist ?? persistWorkspace;
+  let persistenceError = options.seedShowcase !== false && ensureShowcaseData(workspace) && !persist(workspace);
   let state = workspace.boards[workspace.activeBoardId];
   /** @type {Record<string, import("./board.view-state.js").BoardViewState>} */
   const boardViewStates = {};
@@ -196,7 +200,7 @@ export function createBoardController(app) {
 
   function saveState() {
     workspace.boards[workspace.activeBoardId] = state;
-    persistenceError = !persistWorkspace(workspace);
+    persistenceError = !persist(workspace);
   }
 
   /** @param {import("./board.persistence.js").BoardWorkspace} nextWorkspace */

@@ -1,6 +1,7 @@
 const JSON_HEADERS = {
   "Content-Type": "application/json; charset=utf-8",
   "Cache-Control": "no-store",
+  "Access-Control-Allow-Origin": "*",
 };
 
 /**
@@ -40,7 +41,7 @@ export function createApiHandler({ database, boardService, currentUserId = null 
         return;
       }
       try {
-        sendJson(response, 200, { boards: await boardService.listBoards(currentUserId) });
+        sendJson(response, 200, { currentUserId, boards: await boardService.listBoards(currentUserId) });
       } catch {
         sendJson(response, 500, internalError());
       }
