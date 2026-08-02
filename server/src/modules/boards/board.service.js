@@ -12,6 +12,7 @@ import { randomUUID } from "node:crypto";
  * @property {(boardId: string, taskId: string, userId: string, version: unknown) => Promise<{status: "deleted"|"not_found"|"forbidden"|"conflict"}|{status: "invalid", message: string}>} deleteTask
  * @property {(boardId: string, stageId: string, userId: string, input: unknown) => Promise<{status: "updated", stage: Record<string, any>}|{status: "not_found"|"forbidden"|"conflict"}|{status: "invalid", message: string}>} updateStage
  * @property {(boardId: string, userId: string, input: unknown) => Promise<{status: "created", stage: Record<string, any>}|{status: "not_found"|"forbidden"}|{status: "invalid", message: string}>} createStage
+ * @property {(boardId: string, stageId: string, userId: string, input: unknown) => Promise<{status: "moved", stage: Record<string, any>}|{status: "not_found"|"forbidden"|"conflict"}|{status: "invalid", message: string}>} moveStage
  */
 
 /**
@@ -163,7 +164,32 @@ export function createBoardService(repository) {
       const row = result.stage;
       return { status: "created", stage: { id: String(row.id), title: String(row.title), color: String(row.color), kind: String(row.kind), limit: row.wip_limit === null ? null : Number(row.wip_limit), limitMode: String(row.wip_limit_mode), requireCompletedTodos: Boolean(row.require_completed_todos), allowedTargetIds: row.allowed_target_ids, taskIds: [], version: Number(row.version) } };
     },
+
+    async moveStage(boardId, stageId, userId, input) {
+      const parsed = parseStageMove(input);
+      if ("message" in parsed) return { status: "invalid", message: parsed.message };
+      if (!repository.findStageForUser || !repository.moveStage) throw new Error("Stage moves are unavailable.");
+      const current = await repository.findStageForUser(boardId, stageId, userId);
+      if (!current) return { status: "not_found" };
+      if (current.role !== "owner") return { status: "forbidden" };
+      if (Number(current.version) !== parsed.version) return { status: "conflict" };
+      const row = await repository.moveStage(boardId, stageId, parsed.targetIndex, parsed.version);
+      if (!row) return { status: "conflict" };
+      return { status: "moved", stage: { id: String(row.id), position: Number(row.position), version: Number(row.version) } };
+    },
   };
+}
+
+/**
+ * @param {unknown} input
+ * @returns {{message: string}|{targetIndex: number, version: number}}
+ */
+function parseStageMove(input) {
+  if (!input || typeof input !== "object" || Array.isArray(input)) return { message: "A JSON object is required." };
+  const value = /** @type {Record<string, unknown>} */ (input);
+  if (!Number.isInteger(value.targetIndex) || Number(value.targetIndex) < 0) return { message: "Target index must be a non-negative integer." };
+  if (!Number.isInteger(value.version) || Number(value.version) < 1) return { message: "Stage version must be a positive integer." };
+  return { targetIndex: Number(value.targetIndex), version: Number(value.version) };
 }
 
 /** @param {unknown} input */

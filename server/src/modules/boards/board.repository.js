@@ -14,6 +14,7 @@
  * @property {(boardId: string, stageId: string, userId: string) => Promise<Record<string, any>|null>} [findStageForUser]
  * @property {(boardId: string, stageId: string, version: number, input: Record<string, any>) => Promise<Record<string, any>|null>} [updateStage]
  * @property {(boardId: string, userId: string, input: Record<string, any>) => Promise<{status: "created", stage: Record<string, any>}|{status: "not_found"|"forbidden"|"invalid_targets"}>} [createStage]
+ * @property {(boardId: string, stageId: string, targetIndex: number, version: number) => Promise<Record<string, any>|null>} [moveStage]
  */
 
 /**
@@ -323,6 +324,35 @@ export function createBoardRepository(database) {
         await client.query(`UPDATE boards SET version = version + 1, updated_at = now() WHERE id = $1`, [boardId]);
         await client.query("COMMIT");
         return { status: "created", stage: { ...created.rows[0], allowed_target_ids: input.allowedTargetIds } };
+      } catch (error) { await client.query("ROLLBACK"); throw error; } finally { client.release(); }
+    },
+
+    async moveStage(boardId, stageId, targetIndex, version) {
+      if (!("connect" in database) || typeof database.connect !== "function") throw new Error("Transactions are unavailable.");
+      const client = await database.connect();
+      try {
+        await client.query("BEGIN");
+        const locked = await client.query(`SELECT id, position, version FROM stages WHERE board_id = $1 ORDER BY position FOR UPDATE`, [boardId]);
+        const current = locked.rows.find((row) => String(row.id) === stageId);
+        if (!current || Number(current.version) !== version) { await client.query("ROLLBACK"); return null; }
+        const nextPosition = Math.min(targetIndex, locked.rows.length - 1);
+        if (nextPosition === Number(current.position)) { await client.query("COMMIT"); return current; }
+        const result = await client.query(`
+          UPDATE stages SET
+            position = CASE
+              WHEN id = $2 THEN $4::integer
+              WHEN $3::integer < $4::integer AND position > $3::integer AND position <= $4::integer THEN position - 1
+              WHEN $4::integer < $3::integer AND position >= $4::integer AND position < $3::integer THEN position + 1
+              ELSE position
+            END,
+            version = CASE WHEN id = $2 THEN version + 1 ELSE version END,
+            updated_at = CASE WHEN id = $2 THEN now() ELSE updated_at END
+          WHERE board_id = $1
+          RETURNING id, position, version
+        `, [boardId, stageId, Number(current.position), nextPosition]);
+        await client.query(`UPDATE boards SET version = version + 1, updated_at = now() WHERE id = $1`, [boardId]);
+        await client.query("COMMIT");
+        return result.rows.find((row) => String(row.id) === stageId) ?? null;
       } catch (error) { await client.query("ROLLBACK"); throw error; } finally { client.release(); }
     },
   };

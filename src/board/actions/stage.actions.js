@@ -93,8 +93,17 @@ export function createStageActions(context) {
     moveStage(columnId, direction) {
       if (!context.isBoardOwner()) return;
       const state = context.state();
-      moveColumn(state, columnId, state.columns.findIndex(({ id }) => id === columnId) + direction);
+      const previous = [...state.columns];
+      const stage = state.columns.find(({ id }) => id === columnId);
+      const targetIndex = Math.max(0, Math.min(state.columns.findIndex(({ id }) => id === columnId) + direction, state.columns.length - 1));
+      moveColumn(state, columnId, targetIndex);
       context.viewState().openColumnMenuId = null;
+      if (stage && context.moveStageRemote) {
+        context.render();
+        return context.moveStageRemote(context.workspace.activeBoardId, stage, targetIndex)
+          .then((saved) => { stage.version = saved.version; context.saveState(); context.render(); })
+          .catch((error) => { state.columns.splice(0, state.columns.length, ...previous); context.render(); throw error; });
+      }
       context.saveState();
       context.render();
     },

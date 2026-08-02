@@ -143,6 +143,23 @@ test("erstellt eine Stage mit Übergängen in PostgreSQL", { skip: !database }, 
   assert.deepEqual(refreshed.columns.at(-1).allowedTargetIds, [target.id]);
 });
 
+test("sortiert eine Stage transaktional in PostgreSQL", { skip: !database }, async () => {
+  const board = (await (await fetch(`${baseUrl}/api/boards/${boardId}`)).json()).board;
+  const stage = board.columns[0];
+  const targetIndex = board.columns.length - 1;
+  const response = await fetch(`${baseUrl}/api/boards/${boardId}/stages/${stage.id}/position`, {
+    method: "PATCH", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ targetIndex, version: stage.version }),
+  });
+  assert.equal(response.status, 200);
+  const moved = (await response.json()).stage;
+  assert.equal(moved.position, targetIndex);
+  assert.equal(moved.version, stage.version + 1);
+
+  const refreshed = (await (await fetch(`${baseUrl}/api/boards/${boardId}`)).json()).board;
+  assert.equal(refreshed.columns.at(-1).id, stage.id);
+});
+
 async function cleanup() {
   if (!database) return;
   await database.query("DELETE FROM workspace_imports WHERE fingerprint = $1", [plan.fingerprint]);

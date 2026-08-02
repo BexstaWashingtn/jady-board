@@ -154,6 +154,23 @@ export function createApiHandler({ database, boardService, currentUserId = null 
       return;
     }
 
+    const moveStageMatch = method === "PATCH" ? url.pathname.match(/^\/api\/boards\/([^/]+)\/stages\/([^/]+)\/position$/) : null;
+    if (moveStageMatch) {
+      if (!boardService || !currentUserId) { sendJson(response, 503, identityUnavailable()); return; }
+      const boardId = decodeURIComponent(moveStageMatch[1]); const stageId = decodeURIComponent(moveStageMatch[2]);
+      if (!isUuid(boardId) || !isUuid(stageId)) { sendJson(response, 400, { error: { code: "INVALID_RESOURCE_ID", message: "Board and stage IDs must be UUIDs." } }); return; }
+      let body; try { body = await readJson(request); } catch { sendJson(response, 400, { error: { code: "INVALID_JSON", message: "A valid JSON request body is required." } }); return; }
+      try {
+        const result = await boardService.moveStage(boardId, stageId, currentUserId, body);
+        if (result.status === "moved") sendJson(response, 200, { stage: result.stage });
+        else if (result.status === "invalid") sendJson(response, 400, { error: { code: "INVALID_STAGE_MOVE", message: result.message } });
+        else if (result.status === "forbidden") sendJson(response, 403, { error: { code: "STAGE_MOVE_FORBIDDEN", message: "Stage move is not permitted." } });
+        else if (result.status === "conflict") sendJson(response, 409, { error: { code: "STAGE_VERSION_CONFLICT", message: "Stage has been changed by another request." } });
+        else sendJson(response, 404, { error: { code: "STAGE_NOT_FOUND", message: "Stage not found." } });
+      } catch { sendJson(response, 500, internalError()); }
+      return;
+    }
+
     const moveMatch = method === "PATCH" ? url.pathname.match(/^\/api\/boards\/([^/]+)\/tasks\/([^/]+)\/position$/) : null;
     if (moveMatch) {
       if (!boardService || !currentUserId) { sendJson(response, 503, identityUnavailable()); return; }

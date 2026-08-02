@@ -15,7 +15,7 @@ import { createBoardViewState } from "./board.view-state.js";
 
 /**
  * @param {import("../core/JaDyDoCo.js").JaDyDoCo} app
- * @param {{workspace?: import("./board.persistence.js").BoardWorkspace, persist?: typeof persistWorkspace, seedShowcase?: boolean, updateTaskRemote?: (boardId: string, task: import("./board.state.js").BoardTask) => Promise<Partial<import("./board.state.js").BoardTask>>, moveTaskRemote?: (boardId: string, task: import("./board.state.js").BoardTask, stageId: string, targetIndex: number) => Promise<{version: number}>, createTaskRemote?: (boardId: string, task: import("./board.state.js").BoardTask, stageId: string) => Promise<import("./board.state.js").BoardTask>, assignTaskRemote?: (boardId: string, task: import("./board.state.js").BoardTask) => Promise<{assigneeId: string|null, version: number}>, syncTaskTodosRemote?: (boardId: string, task: import("./board.state.js").BoardTask) => Promise<{todos: import("./board.state.js").TaskTodo[], version: number}>, deleteTaskRemote?: (boardId: string, task: import("./board.state.js").BoardTask) => Promise<void>, updateStageRemote?: (boardId: string, stage: import("./board.state.js").BoardColumn) => Promise<Partial<import("./board.state.js").BoardColumn>>, createStageRemote?: (boardId: string, stage: import("./board.state.js").BoardColumn) => Promise<import("./board.state.js").BoardColumn>}} [options]
+ * @param {{workspace?: import("./board.persistence.js").BoardWorkspace, persist?: typeof persistWorkspace, seedShowcase?: boolean, updateTaskRemote?: (boardId: string, task: import("./board.state.js").BoardTask) => Promise<Partial<import("./board.state.js").BoardTask>>, moveTaskRemote?: (boardId: string, task: import("./board.state.js").BoardTask, stageId: string, targetIndex: number) => Promise<{version: number}>, createTaskRemote?: (boardId: string, task: import("./board.state.js").BoardTask, stageId: string) => Promise<import("./board.state.js").BoardTask>, assignTaskRemote?: (boardId: string, task: import("./board.state.js").BoardTask) => Promise<{assigneeId: string|null, version: number}>, syncTaskTodosRemote?: (boardId: string, task: import("./board.state.js").BoardTask) => Promise<{todos: import("./board.state.js").TaskTodo[], version: number}>, deleteTaskRemote?: (boardId: string, task: import("./board.state.js").BoardTask) => Promise<void>, updateStageRemote?: (boardId: string, stage: import("./board.state.js").BoardColumn) => Promise<Partial<import("./board.state.js").BoardColumn>>, createStageRemote?: (boardId: string, stage: import("./board.state.js").BoardColumn) => Promise<import("./board.state.js").BoardColumn>, moveStageRemote?: (boardId: string, stage: import("./board.state.js").BoardColumn, targetIndex: number) => Promise<{position: number, version: number}>}} [options]
  */
 export function createBoardController(app, options = {}) {
   const workspace = options.workspace ?? loadWorkspace();
@@ -70,6 +70,7 @@ export function createBoardController(app, options = {}) {
     deleteTaskRemote: options.deleteTaskRemote,
     updateStageRemote: options.updateStageRemote,
     createStageRemote: options.createStageRemote,
+    moveStageRemote: options.moveStageRemote,
   };
 
   const rawActions = {

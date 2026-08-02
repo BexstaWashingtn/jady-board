@@ -657,6 +657,21 @@ describe("Board-Controller-Integration", () => {
     assert.equal(controller.getState().columns.at(-1).version, 1);
   });
 
+  test("sortiert Stages im API-Modus und übernimmt die neue Version", async () => {
+    const state = createInitialBoardState();
+    state.columns[0].version = 2;
+    let received;
+    const workspace = { activeBoardId: "api-board", boards: { "api-board": state }, activeUserId: "user-1", users: { "user-1": { id: "user-1", name: "API User", initials: "AU", preferences: { theme: /** @type {const} */ ("system") } } } };
+    const controller = createBoardController(createApp("#root"), {
+      workspace, persist: () => true, seedShowcase: false,
+      async moveStageRemote(_boardId, stage, targetIndex) { received = { id: stage.id, version: stage.version, targetIndex }; return { position: targetIndex, version: 3 }; },
+    });
+    await controller.actions.moveStage("backlog", 1);
+    assert.deepEqual(received, { id: "backlog", version: 2, targetIndex: 1 });
+    assert.equal(controller.getState().columns[1].id, "backlog");
+    assert.equal(controller.getState().columns[1].version, 3);
+  });
+
   test("erlaubt Mitgliedern freie Tasks zu übernehmen und wieder freizugeben", () => {
     const controller = startController();
     controller.actions.switchUser("user-demo-lukas");

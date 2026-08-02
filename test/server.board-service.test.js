@@ -219,6 +219,18 @@ describe("Board-Service", () => {
     assert.equal(result.status === "created" && result.stage.version, 1);
     assert.deepEqual(result.status === "created" && result.stage.taskIds, []);
   });
+
+  test("sortiert Stages ausschließlich versioniert als Owner", async () => {
+    let received;
+    const service = createBoardService({
+      async listForUser() { return []; }, async findForUser() { return null; },
+      async findStageForUser() { return { id: STAGE_ID, version: 2, role: "owner" }; },
+      async moveStage(...args) { received = args; return { id: STAGE_ID, position: 1, version: 3 }; },
+    });
+    const result = await service.moveStage(BOARD_ID, STAGE_ID, USER_ID, { targetIndex: 1, version: 2 });
+    assert.deepEqual(received, [BOARD_ID, STAGE_ID, 1, 2]);
+    assert.deepEqual(result, { status: "moved", stage: { id: STAGE_ID, position: 1, version: 3 } });
+  });
 });
 
 const USER_ID = "8acf3017-cf6e-589b-bd47-a1d8ccec16a8";

@@ -205,6 +205,22 @@ export async function createApiStage(baseUrl, boardId, stage, request = fetch) {
   return body.stage;
 }
 
+/** @param {string} baseUrl @param {string} boardId @param {import("./board.state.js").BoardColumn} stage @param {number} targetIndex @param {typeof fetch} [request] */
+export async function moveApiStage(baseUrl, boardId, stage, targetIndex, request = fetch) {
+  if (!Number.isInteger(stage.version) || Number(stage.version) < 1) throw new Error("Die Stage besitzt keine gültige Server-Version.");
+  const response = await request(`${baseUrl}/api/boards/${encodeURIComponent(boardId)}/stages/${encodeURIComponent(stage.id)}/position`, {
+    method: "PATCH", headers: { Accept: "application/json", "Content-Type": "application/json" },
+    body: JSON.stringify({ targetIndex, version: stage.version }),
+  });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    if (response.status === 409) throw new Error("Die Stage wurde zwischenzeitlich geändert. Bitte lade das Board neu.");
+    throw new Error(String(body?.error?.message ?? `Stage konnte nicht verschoben werden (${response.status}).`));
+  }
+  if (!body.stage || Number(body.stage.version) < 1 || !Number.isInteger(body.stage.position)) throw new Error("Die Board-API hat eine ungültige Stage-Position zurückgegeben.");
+  return body.stage;
+}
+
 /** @param {typeof fetch} request @param {string} url @returns {Promise<Record<string, any>>} */
 async function getJson(request, url) {
   const response = await request(url, { headers: { Accept: "application/json" } });

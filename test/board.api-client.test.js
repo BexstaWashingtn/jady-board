@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 
-import { assignApiTask, createApiStage, createApiTask, deleteApiTask, loadApiWorkspace, moveApiTask, readApiDataSource, syncApiTaskTodos, updateApiStage, updateApiTask } from "../src/board/board.api-client.js";
+import { assignApiTask, createApiStage, createApiTask, deleteApiTask, loadApiWorkspace, moveApiStage, moveApiTask, readApiDataSource, syncApiTaskTodos, updateApiStage, updateApiTask } from "../src/board/board.api-client.js";
 
 describe("Board-API-Client", () => {
   test("aktiviert die API ausschließlich per URL-Opt-in", () => {
@@ -130,6 +130,17 @@ describe("Board-API-Client", () => {
     assert.equal(received.method, "POST");
     assert.equal(received.body.title, "Backlog");
     assert.equal(saved.id, "server-stage-id");
+  });
+
+  test("sortiert Stages mit ihrer aktuellen Version", async () => {
+    const stage = boardResponse().columns[0];
+    let requestBody;
+    const saved = await moveApiStage("http://api", "board-id", stage, 2, async (_url, options) => {
+      requestBody = JSON.parse(options.body);
+      return response({ stage: { id: stage.id, position: 2, version: 2 } });
+    });
+    assert.deepEqual(requestBody, { targetIndex: 2, version: 1 });
+    assert.deepEqual(saved, { id: stage.id, position: 2, version: 2 });
   });
 });
 
