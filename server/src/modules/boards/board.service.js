@@ -8,6 +8,7 @@ import { randomUUID } from "node:crypto";
  * @property {(boardId: string, taskId: string, userId: string, input: unknown) => Promise<{status: "moved", task: Record<string, any>}|{status: "not_found"|"forbidden"|"conflict"}|{status: "rejected", code: string, message: string}|{status: "invalid", message: string}>} moveTask
  * @property {(boardId: string, userId: string, input: unknown) => Promise<{status: "created", task: Record<string, any>}|{status: "not_found"|"forbidden"}|{status: "rejected", code: string, message: string}|{status: "invalid", message: string}>} createTask
  * @property {(boardId: string, taskId: string, userId: string, input: unknown) => Promise<{status: "updated", task: Record<string, any>}|{status: "not_found"|"forbidden"|"conflict"}|{status: "invalid", message: string}>} assignTask
+ * @property {(boardId: string, taskId: string, userId: string, input: unknown) => Promise<{status: "updated", task: Record<string, any>}|{status: "not_found"|"forbidden"|"conflict"}|{status: "invalid", message: string}>} syncTaskTodos
  */
 
 /**
@@ -108,7 +109,46 @@ export function createBoardService(repository) {
       if (!updated) return { status: "conflict" };
       return { status: "updated", task: { id: String(updated.id), assigneeId: updated.assignee_id ? String(updated.assignee_id) : null, version: Number(updated.version) } };
     },
+
+    async syncTaskTodos(boardId, taskId, userId, input) {
+      const parsed = parseTodoSync(input);
+      if ("message" in parsed) return { status: "invalid", message: parsed.message };
+      if (!repository.findTaskForUser || !repository.replaceTaskTodos) throw new Error("Todo writes are unavailable.");
+      const current = await repository.findTaskForUser(boardId, taskId, userId);
+      if (!current) return { status: "not_found" };
+      if (current.role !== "owner" && String(current.assignee_id ?? "") !== userId) return { status: "forbidden" };
+      if (Number(current.version) !== parsed.version) return { status: "conflict" };
+      const todos = parsed.todos.map((todo) => ({ ...todo, id: isUuid(todo.id) ? todo.id : randomUUID() }));
+      const updated = await repository.replaceTaskTodos(boardId, taskId, parsed.version, todos);
+      if (!updated) return { status: "conflict" };
+      return { status: "updated", task: { id: taskId, todos: updated.todos, version: Number(updated.version) } };
+    },
   };
+}
+
+/**
+ * @param {unknown} input
+ * @returns {{message: string}|{version: number, todos: {id: string, text: string, completed: boolean}[]}}
+ */
+function parseTodoSync(input) {
+  if (!input || typeof input !== "object" || Array.isArray(input)) return { message: "A JSON object is required." };
+  const value = /** @type {Record<string, unknown>} */ (input);
+  if (!Number.isInteger(value.version) || Number(value.version) < 1) return { message: "Task version must be a positive integer." };
+  if (!Array.isArray(value.todos) || value.todos.length > 100) return { message: "Task todos must be an array with at most 100 entries." };
+  const todos = [];
+  for (const entry of value.todos) {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) return { message: "Each todo must be an object." };
+    const todo = /** @type {Record<string, unknown>} */ (entry);
+    const text = typeof todo.text === "string" ? todo.text.trim() : "";
+    if (!text || text.length > 500 || typeof todo.completed !== "boolean") return { message: "Todo text or completion state is invalid." };
+    todos.push({ id: typeof todo.id === "string" ? todo.id : "", text, completed: todo.completed });
+  }
+  return { version: Number(value.version), todos };
+}
+
+/** @param {string} value */
+function isUuid(value) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }
 
 /**

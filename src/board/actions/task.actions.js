@@ -52,20 +52,25 @@ export function createTaskActions(context) {
       if (!canWorkOnTask(context.state(), taskId, context.workspace.activeUserId)) return;
       const input = document.querySelector("#new-todo");
       if (!(input instanceof HTMLInputElement)) return;
+      const previous = todoSnapshot(context.state(), taskId);
       addTaskTodo(context.state(), taskId, input.value);
-      context.saveState();
-      context.render();
-      queueMicrotask(() => {
+      const finish = () => {
+        context.saveState();
+        context.render();
+        queueMicrotask(() => {
         const nextInput = document.querySelector("#new-todo");
         if (nextInput instanceof HTMLInputElement) nextInput.focus();
-      });
+        });
+      };
+      if (context.syncTaskTodosRemote) return persistRemoteTodos(context, context.state(), taskId, previous).then(finish);
+      finish();
     },
     /** @param {string} taskId @param {string} todoId @param {boolean} completed */
-    toggleTodo(taskId, todoId, completed) { if (!canWorkOnTask(context.state(), taskId, context.workspace.activeUserId)) return; updateTaskTodo(context.state(), taskId, todoId, { completed }); context.saveState(); context.render(); },
+    toggleTodo(taskId, todoId, completed) { if (!canWorkOnTask(context.state(), taskId, context.workspace.activeUserId)) return; const previous = todoSnapshot(context.state(), taskId); updateTaskTodo(context.state(), taskId, todoId, { completed }); const finish = () => { context.saveState(); context.render(); }; if (context.syncTaskTodosRemote) return persistRemoteTodos(context, context.state(), taskId, previous).then(finish); finish(); },
     /** @param {string} taskId @param {string} todoId @param {string} text */
-    updateTodo(taskId, todoId, text) { if (!canWorkOnTask(context.state(), taskId, context.workspace.activeUserId)) return; updateTaskTodo(context.state(), taskId, todoId, { text }); context.saveState(); },
+    updateTodo(taskId, todoId, text) { if (!canWorkOnTask(context.state(), taskId, context.workspace.activeUserId)) return; const previous = todoSnapshot(context.state(), taskId); updateTaskTodo(context.state(), taskId, todoId, { text }); const finish = () => context.saveState(); if (context.syncTaskTodosRemote) return persistRemoteTodos(context, context.state(), taskId, previous).then(finish); finish(); },
     /** @param {string} taskId @param {string} todoId */
-    deleteTodo(taskId, todoId) { if (!canWorkOnTask(context.state(), taskId, context.workspace.activeUserId)) return; deleteTaskTodo(context.state(), taskId, todoId); context.saveState(); context.render(); },
+    deleteTodo(taskId, todoId) { if (!canWorkOnTask(context.state(), taskId, context.workspace.activeUserId)) return; const previous = todoSnapshot(context.state(), taskId); deleteTaskTodo(context.state(), taskId, todoId); const finish = () => { context.saveState(); context.render(); }; if (context.syncTaskTodosRemote) return persistRemoteTodos(context, context.state(), taskId, previous).then(finish); finish(); },
 
     undoLastAction() {
       const viewState = context.viewState();
@@ -247,6 +252,24 @@ async function persistRemoteAssignment(context, state, taskId, previous) {
     Object.assign(state.tasks[taskId], saved);
   } catch (error) {
     state.tasks[taskId].assigneeId = previous;
+    throw error;
+  }
+}
+
+/** @param {import("../board.state.js").BoardState} state @param {string} taskId */
+function todoSnapshot(state, taskId) {
+  return { todos: structuredClone(state.tasks[taskId].todos), version: state.tasks[taskId].version };
+}
+
+/** @param {import("./action-context.js").BoardActionContext} context @param {import("../board.state.js").BoardState} state @param {string} taskId @param {{todos: import("../board.state.js").TaskTodo[], version: number|undefined}} previous */
+async function persistRemoteTodos(context, state, taskId, previous) {
+  if (!context.syncTaskTodosRemote) return;
+  try {
+    const saved = await context.syncTaskTodosRemote(context.workspace.activeBoardId, state.tasks[taskId]);
+    Object.assign(state.tasks[taskId], saved);
+  } catch (error) {
+    state.tasks[taskId].todos = previous.todos;
+    state.tasks[taskId].version = previous.version;
     throw error;
   }
 }

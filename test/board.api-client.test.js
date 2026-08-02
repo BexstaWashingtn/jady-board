@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 
-import { assignApiTask, createApiTask, loadApiWorkspace, moveApiTask, readApiDataSource, updateApiTask } from "../src/board/board.api-client.js";
+import { assignApiTask, createApiTask, loadApiWorkspace, moveApiTask, readApiDataSource, syncApiTaskTodos, updateApiTask } from "../src/board/board.api-client.js";
 
 describe("Board-API-Client", () => {
   test("aktiviert die API ausschließlich per URL-Opt-in", () => {
@@ -85,6 +85,17 @@ describe("Board-API-Client", () => {
     });
     assert.deepEqual(requestBody, { assigneeId: null, version: 1 });
     assert.equal(assigned.version, 2);
+  });
+
+  test("synchronisiert die vollständige Todo-Liste", async () => {
+    const task = { ...boardResponse().tasks["task-id"], todos: [{ id: "todo", text: "Test", completed: true }] };
+    let requestBody;
+    const saved = await syncApiTaskTodos("http://api", "board-id", task, async (_url, options) => {
+      requestBody = JSON.parse(options.body);
+      return response({ task: { todos: task.todos, version: 2 } });
+    });
+    assert.deepEqual(requestBody, { todos: task.todos, version: 1 });
+    assert.equal(saved.version, 2);
   });
 });
 

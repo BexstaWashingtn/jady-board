@@ -228,6 +228,21 @@ describe("Task-Schreib-API", () => {
     assert.equal(response.status, 200);
     assert.deepEqual((await response.json()).task, { id: taskId, assigneeId: userId, version: 2 });
   });
+
+  test("synchronisiert Todos über einen stabilen HTTP-Vertrag", async () => {
+    const boardService = {
+      async listBoards() { return []; }, async getBoard() { return null; },
+      async updateTask() { return { status: /** @type {const} */ ("not_found") }; }, async moveTask() { return { status: /** @type {const} */ ("not_found") }; },
+      async createTask() { return { status: /** @type {const} */ ("not_found") }; }, async assignTask() { return { status: /** @type {const} */ ("not_found") }; },
+      async syncTaskTodos() { return { status: /** @type {const} */ ("updated"), task: { id: taskId, todos: [], version: 2 } }; },
+    };
+    const baseUrl = await listenApi({ boardService, currentUserId: userId });
+    const response = await fetch(`${baseUrl}/api/boards/${boardId}/tasks/${taskId}/todos`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ todos: [], version: 1 }),
+    });
+    assert.equal(response.status, 200);
+    assert.deepEqual((await response.json()).task, { id: taskId, todos: [], version: 2 });
+  });
 });
 
 /**

@@ -554,6 +554,30 @@ describe("Board-Controller-Integration", () => {
     assert.equal(controller.getState().tasks["KAN-18"].version, 3);
   });
 
+  test("übernimmt kanonische Todos und Version aus der API", async () => {
+    const state = createInitialBoardState();
+    state.tasks["KAN-18"].version = 2;
+    const workspace = {
+      activeBoardId: "api-board", boards: { "api-board": state }, activeUserId: "user-1",
+      users: { "user-1": { id: "user-1", name: "API User", initials: "AU", preferences: { theme: /** @type {const} */ ("system") } } },
+    };
+    const controller = createBoardController(createApp("#root"), {
+      workspace, persist: () => true, seedShowcase: false,
+      async syncTaskTodosRemote(_boardId, task) {
+        const todos = task.todos.map((todo, index) => ({ ...todo, id: `00000000-0000-4000-8000-00000000000${index}` }));
+        return { todos, version: 3 };
+      },
+    });
+    controller.actions.openTask("KAN-18");
+    const input = document.querySelector("#new-todo");
+    assert.ok(input instanceof HTMLInputElement);
+    input.value = "Server Todo";
+    await controller.actions.addTodo("KAN-18");
+    const todo = controller.getState().tasks["KAN-18"].todos.find(({ text }) => text === "Server Todo");
+    assert.match(todo.id, /^[0-9a-f-]{36}$/);
+    assert.equal(controller.getState().tasks["KAN-18"].version, 3);
+  });
+
   test("erlaubt Mitgliedern freie Tasks zu übernehmen und wieder freizugeben", () => {
     const controller = startController();
     controller.actions.switchUser("user-demo-lukas");

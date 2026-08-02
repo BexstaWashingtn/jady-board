@@ -161,6 +161,19 @@ describe("Board-Service", () => {
     });
     assert.equal((await service.assignTask(BOARD_ID, TASK_ID, USER_ID, { assigneeId: TARGET_STAGE_ID, version: 2 })).status, "forbidden");
   });
+
+  test("synchronisiert Todos und ersetzt temporäre IDs", async () => {
+    let received;
+    const service = createBoardService({
+      async listForUser() { return []; }, async findForUser() { return null; },
+      async findTaskForUser() { return { id: TASK_ID, assignee_id: USER_ID, version: 2, role: "member" }; },
+      async replaceTaskTodos(_boardId, _taskId, _version, todos) { received = todos; return { id: TASK_ID, version: 3, todos }; },
+    });
+    const result = await service.syncTaskTodos(BOARD_ID, TASK_ID, USER_ID, { version: 2, todos: [{ id: "temporary", text: " Testen ", completed: false }] });
+    assert.match(received[0].id, /^[0-9a-f-]{36}$/);
+    assert.equal(result.status === "updated" && result.task.todos[0].text, "Testen");
+    assert.equal(result.status === "updated" && result.task.version, 3);
+  });
 });
 
 const USER_ID = "8acf3017-cf6e-589b-bd47-a1d8ccec16a8";

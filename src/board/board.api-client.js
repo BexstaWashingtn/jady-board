@@ -145,6 +145,26 @@ export async function assignApiTask(baseUrl, boardId, task, request = fetch) {
   return body.task;
 }
 
+/**
+ * @param {string} baseUrl @param {string} boardId @param {import("./board.state.js").BoardTask} task
+ * @param {typeof fetch} [request]
+ * @returns {Promise<{todos: import("./board.state.js").TaskTodo[], version: number}>}
+ */
+export async function syncApiTaskTodos(baseUrl, boardId, task, request = fetch) {
+  if (!Number.isInteger(task.version) || Number(task.version) < 1) throw new Error("Der Task besitzt keine gültige Server-Version.");
+  const response = await request(`${baseUrl}/api/boards/${encodeURIComponent(boardId)}/tasks/${encodeURIComponent(task.id)}/todos`, {
+    method: "PATCH", headers: { Accept: "application/json", "Content-Type": "application/json" },
+    body: JSON.stringify({ todos: task.todos, version: task.version }),
+  });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    if (response.status === 409) throw new Error("Der Task wurde zwischenzeitlich geändert. Bitte lade das Board neu.");
+    throw new Error(String(body?.error?.message ?? `Todos konnten nicht gespeichert werden (${response.status}).`));
+  }
+  if (!Array.isArray(body.task?.todos) || Number(body.task.version) < 1) throw new Error("Die Board-API hat ungültige Todos zurückgegeben.");
+  return body.task;
+}
+
 /** @param {typeof fetch} request @param {string} url @returns {Promise<Record<string, any>>} */
 async function getJson(request, url) {
   const response = await request(url, { headers: { Accept: "application/json" } });
