@@ -672,6 +672,27 @@ describe("Board-Controller-Integration", () => {
     assert.equal(controller.getState().columns[1].version, 3);
   });
 
+  test("löscht Stages im API-Modus mit serverseitiger Task-Übernahme", async () => {
+    const state = createInitialBoardState();
+    state.columns[0].version = 2;
+    const movedTaskId = state.columns[0].taskIds[0];
+    state.tasks[movedTaskId].version = 4;
+    let received;
+    const workspace = { activeBoardId: "api-board", boards: { "api-board": state }, activeUserId: "user-1", users: { "user-1": { id: "user-1", name: "API User", initials: "AU", preferences: { theme: /** @type {const} */ ("system") } } } };
+    const controller = createBoardController(createApp("#root"), {
+      workspace, persist: () => true, seedShowcase: false,
+      async deleteStageRemote(_boardId, stage, moveTasksTo) { received = { id: stage.id, version: stage.version, moveTasksTo }; },
+    });
+    controller.actions.requestDeleteStage("backlog");
+    const form = document.querySelector(".stage-editor--delete");
+    assert.ok(form instanceof HTMLFormElement);
+    await controller.actions.confirmDeleteStage({ preventDefault() {}, currentTarget: form });
+    assert.deepEqual(received, { id: "backlog", version: 2, moveTasksTo: "progress" });
+    assert.equal(controller.getState().columns.some(({ id }) => id === "backlog"), false);
+    assert.ok(controller.getState().columns.find(({ id }) => id === "progress").taskIds.includes(movedTaskId));
+    assert.equal(controller.getState().tasks[movedTaskId].version, 5);
+  });
+
   test("erlaubt Mitgliedern freie Tasks zu übernehmen und wieder freizugeben", () => {
     const controller = startController();
     controller.actions.switchUser("user-demo-lukas");

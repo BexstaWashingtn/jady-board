@@ -160,6 +160,22 @@ test("sortiert eine Stage transaktional in PostgreSQL", { skip: !database }, asy
   assert.equal(refreshed.columns.at(-1).id, stage.id);
 });
 
+test("löscht eine Stage und übernimmt ihre Tasks in PostgreSQL", { skip: !database }, async () => {
+  const board = (await (await fetch(`${baseUrl}/api/boards/${boardId}`)).json()).board;
+  const source = board.columns.find((column) => column.taskIds.length);
+  const target = board.columns.find((column) => column.id !== source.id);
+  const movedTaskId = source.taskIds[0];
+  const response = await fetch(`${baseUrl}/api/boards/${boardId}/stages/${source.id}`, {
+    method: "DELETE", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ version: source.version, moveTasksTo: target.id }),
+  });
+  assert.equal(response.status, 204);
+
+  const refreshed = (await (await fetch(`${baseUrl}/api/boards/${boardId}`)).json()).board;
+  assert.equal(refreshed.columns.some((column) => column.id === source.id), false);
+  assert.ok(refreshed.columns.find((column) => column.id === target.id).taskIds.includes(movedTaskId));
+});
+
 async function cleanup() {
   if (!database) return;
   await database.query("DELETE FROM workspace_imports WHERE fingerprint = $1", [plan.fingerprint]);

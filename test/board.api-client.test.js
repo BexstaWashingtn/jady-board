@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 
-import { assignApiTask, createApiStage, createApiTask, deleteApiTask, loadApiWorkspace, moveApiStage, moveApiTask, readApiDataSource, syncApiTaskTodos, updateApiStage, updateApiTask } from "../src/board/board.api-client.js";
+import { assignApiTask, createApiStage, createApiTask, deleteApiStage, deleteApiTask, loadApiWorkspace, moveApiStage, moveApiTask, readApiDataSource, syncApiTaskTodos, updateApiStage, updateApiTask } from "../src/board/board.api-client.js";
 
 describe("Board-API-Client", () => {
   test("aktiviert die API ausschließlich per URL-Opt-in", () => {
@@ -141,6 +141,18 @@ describe("Board-API-Client", () => {
     });
     assert.deepEqual(requestBody, { targetIndex: 2, version: 1 });
     assert.deepEqual(saved, { id: stage.id, position: 2, version: 2 });
+  });
+
+  test("löscht Stages mit Version und Ziel-Stage", async () => {
+    const stage = boardResponse().columns[0];
+    let received;
+    await deleteApiStage("http://api", "board-id", stage, "target-stage", async (url, options) => {
+      received = { url, method: options.method, body: JSON.parse(options.body) };
+      return { ok: true, status: 204 };
+    });
+    assert.equal(received.url, "http://api/api/boards/board-id/stages/stage-id");
+    assert.equal(received.method, "DELETE");
+    assert.deepEqual(received.body, { version: 1, moveTasksTo: "target-stage" });
   });
 });
 

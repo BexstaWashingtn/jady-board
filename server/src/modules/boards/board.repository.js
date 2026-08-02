@@ -15,6 +15,7 @@
  * @property {(boardId: string, stageId: string, version: number, input: Record<string, any>) => Promise<Record<string, any>|null>} [updateStage]
  * @property {(boardId: string, userId: string, input: Record<string, any>) => Promise<{status: "created", stage: Record<string, any>}|{status: "not_found"|"forbidden"|"invalid_targets"}>} [createStage]
  * @property {(boardId: string, stageId: string, targetIndex: number, version: number) => Promise<Record<string, any>|null>} [moveStage]
+ * @property {(boardId: string, stageId: string, version: number, moveTasksTo: string|null) => Promise<"deleted"|"conflict"|"last_stage"|"invalid_target"|"wip_limit">} [deleteStage]
  */
 
 /**
@@ -353,6 +354,34 @@ export function createBoardRepository(database) {
         await client.query(`UPDATE boards SET version = version + 1, updated_at = now() WHERE id = $1`, [boardId]);
         await client.query("COMMIT");
         return result.rows.find((row) => String(row.id) === stageId) ?? null;
+      } catch (error) { await client.query("ROLLBACK"); throw error; } finally { client.release(); }
+    },
+
+    async deleteStage(boardId, stageId, version, moveTasksTo) {
+      if (!("connect" in database) || typeof database.connect !== "function") throw new Error("Transactions are unavailable.");
+      const client = await database.connect();
+      try {
+        await client.query("BEGIN");
+        const stages = await client.query(`SELECT id, position, version, wip_limit, wip_limit_mode FROM stages WHERE board_id = $1 ORDER BY position FOR UPDATE`, [boardId]);
+        const source = stages.rows.find((row) => String(row.id) === stageId);
+        if (!source || Number(source.version) !== version) { await client.query("ROLLBACK"); return "conflict"; }
+        if (stages.rows.length <= 1) { await client.query("ROLLBACK"); return "last_stage"; }
+        const target = moveTasksTo ? stages.rows.find((row) => String(row.id) === moveTasksTo && String(row.id) !== stageId) : null;
+        if (moveTasksTo && !target) { await client.query("ROLLBACK"); return "invalid_target"; }
+        const tasks = await client.query(`SELECT id, position FROM tasks WHERE stage_id = $1 ORDER BY position FOR UPDATE`, [stageId]);
+        if (tasks.rowCount && !target) { await client.query("ROLLBACK"); return "invalid_target"; }
+        if (target && tasks.rowCount) {
+          const targetTasks = await client.query(`SELECT id FROM tasks WHERE stage_id = $1 ORDER BY position FOR UPDATE`, [target.id]);
+          if (target.wip_limit_mode === "strict" && target.wip_limit !== null && Number(targetTasks.rowCount) + Number(tasks.rowCount) > Number(target.wip_limit)) {
+            await client.query("ROLLBACK"); return "wip_limit";
+          }
+          await client.query(`UPDATE tasks SET stage_id = $2, position = position + $3, version = version + 1, updated_at = now() WHERE stage_id = $1`, [stageId, target.id, targetTasks.rowCount]);
+        }
+        await client.query(`DELETE FROM stages WHERE board_id = $1 AND id = $2`, [boardId, stageId]);
+        await client.query(`UPDATE stages SET position = position - 1 WHERE board_id = $1 AND position > $2`, [boardId, source.position]);
+        await client.query(`UPDATE boards SET version = version + 1, updated_at = now() WHERE id = $1`, [boardId]);
+        await client.query("COMMIT");
+        return "deleted";
       } catch (error) { await client.query("ROLLBACK"); throw error; } finally { client.release(); }
     },
   };

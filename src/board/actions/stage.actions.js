@@ -114,10 +114,25 @@ export function createStageActions(context) {
       const data = new FormData(event.currentTarget);
       const columnId = String(data.get("columnId") ?? "");
       const state = context.state();
-      deleteColumn(state, columnId, { moveTasksTo: String(data.get("moveTasksTo") ?? "") });
+      const previous = structuredClone(state);
+      const stage = state.columns.find(({ id }) => id === columnId);
+      const moveTasksTo = String(data.get("moveTasksTo") ?? "") || null;
+      deleteColumn(state, columnId, { moveTasksTo: moveTasksTo ?? "" });
       const viewState = context.viewState();
       if (viewState.createTaskColumnId === columnId) viewState.createTaskColumnId = state.columns[0].id;
       viewState.stageEditor = null;
+      if (stage && context.deleteStageRemote) {
+        context.render();
+        return context.deleteStageRemote(context.workspace.activeBoardId, stage, moveTasksTo)
+          .then(() => {
+            stage.taskIds.forEach((taskId) => {
+              const task = state.tasks[taskId];
+              if (task && Number.isInteger(task.version)) task.version = Number(task.version) + 1;
+            });
+            context.saveState(); context.render();
+          })
+          .catch((error) => { context.setState(previous); context.saveState(); context.render(); throw error; });
+      }
       context.saveState();
       context.render();
     },

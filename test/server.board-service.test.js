@@ -231,6 +231,21 @@ describe("Board-Service", () => {
     assert.deepEqual(received, [BOARD_ID, STAGE_ID, 1, 2]);
     assert.deepEqual(result, { status: "moved", stage: { id: STAGE_ID, position: 1, version: 3 } });
   });
+
+  test("löscht Stages versioniert und übersetzt Kapazitätsgrenzen", async () => {
+    let repositoryResult = /** @type {const} */ ("deleted");
+    let received;
+    const service = createBoardService({
+      async listForUser() { return []; }, async findForUser() { return null; },
+      async findStageForUser() { return { id: STAGE_ID, version: 2, role: "owner" }; },
+      async deleteStage(...args) { received = args; return repositoryResult; },
+    });
+    assert.deepEqual(await service.deleteStage(BOARD_ID, STAGE_ID, USER_ID, { version: 2, moveTasksTo: TARGET_STAGE_ID }), { status: "deleted" });
+    assert.deepEqual(received, [BOARD_ID, STAGE_ID, 2, TARGET_STAGE_ID]);
+    repositoryResult = /** @type {const} */ ("wip_limit");
+    const limited = await service.deleteStage(BOARD_ID, STAGE_ID, USER_ID, { version: 2, moveTasksTo: TARGET_STAGE_ID });
+    assert.deepEqual(limited, { status: "rejected", code: "WIP_LIMIT_REACHED", message: "The target stage does not have enough capacity." });
+  });
 });
 
 const USER_ID = "8acf3017-cf6e-589b-bd47-a1d8ccec16a8";

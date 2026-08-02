@@ -221,6 +221,20 @@ export async function moveApiStage(baseUrl, boardId, stage, targetIndex, request
   return body.stage;
 }
 
+/** @param {string} baseUrl @param {string} boardId @param {import("./board.state.js").BoardColumn} stage @param {string|null} moveTasksTo @param {typeof fetch} [request] */
+export async function deleteApiStage(baseUrl, boardId, stage, moveTasksTo, request = fetch) {
+  if (!Number.isInteger(stage.version) || Number(stage.version) < 1) throw new Error("Die Stage besitzt keine gültige Server-Version.");
+  const response = await request(`${baseUrl}/api/boards/${encodeURIComponent(boardId)}/stages/${encodeURIComponent(stage.id)}`, {
+    method: "DELETE", headers: { Accept: "application/json", "Content-Type": "application/json" },
+    body: JSON.stringify({ version: stage.version, moveTasksTo }),
+  });
+  if (response.ok) return;
+  const body = await response.json().catch(() => ({}));
+  if (response.status === 409) throw new Error("Die Stage wurde zwischenzeitlich geändert. Bitte lade das Board neu.");
+  if (body?.error?.code === "WIP_LIMIT_REACHED") throw new Error("Die Ziel-Stage hat nicht genügend freie Kapazität.");
+  throw new Error(String(body?.error?.message ?? `Stage konnte nicht gelöscht werden (${response.status}).`));
+}
+
 /** @param {typeof fetch} request @param {string} url @returns {Promise<Record<string, any>>} */
 async function getJson(request, url) {
   const response = await request(url, { headers: { Accept: "application/json" } });

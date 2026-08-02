@@ -171,6 +171,24 @@ export function createApiHandler({ database, boardService, currentUserId = null 
       return;
     }
 
+    const deleteStageMatch = method === "DELETE" ? url.pathname.match(/^\/api\/boards\/([^/]+)\/stages\/([^/]+)$/) : null;
+    if (deleteStageMatch) {
+      if (!boardService || !currentUserId) { sendJson(response, 503, identityUnavailable()); return; }
+      const boardId = decodeURIComponent(deleteStageMatch[1]); const stageId = decodeURIComponent(deleteStageMatch[2]);
+      if (!isUuid(boardId) || !isUuid(stageId)) { sendJson(response, 400, { error: { code: "INVALID_RESOURCE_ID", message: "Board and stage IDs must be UUIDs." } }); return; }
+      let body; try { body = await readJson(request); } catch { sendJson(response, 400, { error: { code: "INVALID_JSON", message: "A valid JSON request body is required." } }); return; }
+      try {
+        const result = await boardService.deleteStage(boardId, stageId, currentUserId, body);
+        if (result.status === "deleted") { response.writeHead(204, JSON_HEADERS); response.end(); }
+        else if (result.status === "invalid") sendJson(response, 400, { error: { code: "INVALID_STAGE_DELETE", message: result.message } });
+        else if (result.status === "forbidden") sendJson(response, 403, { error: { code: "STAGE_DELETE_FORBIDDEN", message: "Stage deletion is not permitted." } });
+        else if (result.status === "conflict") sendJson(response, 409, { error: { code: "STAGE_VERSION_CONFLICT", message: "Stage has been changed by another request." } });
+        else if (result.status === "rejected") sendJson(response, 422, { error: { code: result.code, message: result.message } });
+        else sendJson(response, 404, { error: { code: "STAGE_NOT_FOUND", message: "Stage not found." } });
+      } catch { sendJson(response, 500, internalError()); }
+      return;
+    }
+
     const moveMatch = method === "PATCH" ? url.pathname.match(/^\/api\/boards\/([^/]+)\/tasks\/([^/]+)\/position$/) : null;
     if (moveMatch) {
       if (!boardService || !currentUserId) { sendJson(response, 503, identityUnavailable()); return; }

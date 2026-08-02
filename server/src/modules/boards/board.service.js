@@ -13,6 +13,7 @@ import { randomUUID } from "node:crypto";
  * @property {(boardId: string, stageId: string, userId: string, input: unknown) => Promise<{status: "updated", stage: Record<string, any>}|{status: "not_found"|"forbidden"|"conflict"}|{status: "invalid", message: string}>} updateStage
  * @property {(boardId: string, userId: string, input: unknown) => Promise<{status: "created", stage: Record<string, any>}|{status: "not_found"|"forbidden"}|{status: "invalid", message: string}>} createStage
  * @property {(boardId: string, stageId: string, userId: string, input: unknown) => Promise<{status: "moved", stage: Record<string, any>}|{status: "not_found"|"forbidden"|"conflict"}|{status: "invalid", message: string}>} moveStage
+ * @property {(boardId: string, stageId: string, userId: string, input: unknown) => Promise<{status: "deleted"|"not_found"|"forbidden"|"conflict"}|{status: "rejected", code: string, message: string}|{status: "invalid", message: string}>} deleteStage
  */
 
 /**
@@ -177,7 +178,36 @@ export function createBoardService(repository) {
       if (!row) return { status: "conflict" };
       return { status: "moved", stage: { id: String(row.id), position: Number(row.position), version: Number(row.version) } };
     },
+
+    async deleteStage(boardId, stageId, userId, input) {
+      const parsed = parseStageDelete(input, stageId);
+      if ("message" in parsed) return { status: "invalid", message: parsed.message };
+      if (!repository.findStageForUser || !repository.deleteStage) throw new Error("Stage deletion is unavailable.");
+      const current = await repository.findStageForUser(boardId, stageId, userId);
+      if (!current) return { status: "not_found" };
+      if (current.role !== "owner") return { status: "forbidden" };
+      if (Number(current.version) !== parsed.version) return { status: "conflict" };
+      const result = await repository.deleteStage(boardId, stageId, parsed.version, parsed.moveTasksTo);
+      if (result === "deleted") return { status: "deleted" };
+      if (result === "conflict") return { status: "conflict" };
+      if (result === "last_stage") return { status: "rejected", code: "LAST_STAGE", message: "A board must retain at least one stage." };
+      if (result === "wip_limit") return { status: "rejected", code: "WIP_LIMIT_REACHED", message: "The target stage does not have enough capacity." };
+      return { status: "rejected", code: "INVALID_TARGET_STAGE", message: "A valid target stage is required for existing tasks." };
+    },
   };
+}
+
+/**
+ * @param {unknown} input @param {string} stageId
+ * @returns {{message: string}|{version: number, moveTasksTo: string|null}}
+ */
+function parseStageDelete(input, stageId) {
+  if (!input || typeof input !== "object" || Array.isArray(input)) return { message: "A JSON object is required." };
+  const value = /** @type {Record<string, unknown>} */ (input);
+  if (!Number.isInteger(value.version) || Number(value.version) < 1) return { message: "Stage version must be a positive integer." };
+  const target = value.moveTasksTo === null || value.moveTasksTo === "" || value.moveTasksTo === undefined ? null : value.moveTasksTo;
+  if (target !== null && (typeof target !== "string" || !isUuid(target) || target === stageId)) return { message: "Target stage is invalid." };
+  return { version: Number(value.version), moveTasksTo: target === null ? null : String(target) };
 }
 
 /**

@@ -251,6 +251,7 @@ Die API verwendet standardmäßig Port `3000`:
 - `PATCH /api/boards/:boardId/stages/:stageId` aktualisiert Stage-Einstellungen, Übergänge und WIP-Regeln versioniert als Board-Owner; der Stage-Editor verwendet diesen Endpunkt im API-Modus.
 - `POST /api/boards/:boardId/stages` legt eine neue Stage samt Übergängen als Board-Owner an; der Stage-Editor übernimmt die serverseitige UUID und Version.
 - `PATCH /api/boards/:boardId/stages/:stageId/position` sortiert eine Stage versioniert und transaktional neu ein.
+- `DELETE /api/boards/:boardId/stages/:stageId` löscht eine Stage versioniert und übernimmt vorhandene Tasks transaktional in eine zulässige Ziel-Stage.
 
 `DEV_USER_ID` ist eine vorübergehende Entwicklungsidentität und muss der UUID eines importierten Benutzers entsprechen. Sie ersetzt keine spätere Authentifizierung.
 
@@ -260,7 +261,7 @@ Der Browser bleibt standardmäßig Local-first. Die lesende API-Anbindung kann f
 http://127.0.0.1:4173/?data-source=api&api-url=http://127.0.0.1:3000
 ```
 
-Der Client lädt dann die zugänglichen Boards aus PostgreSQL. Der vollständige Task-Lebenszyklus einschließlich Erstellen, Bearbeiten, Statusformular, Drag-and-drop, Zuweisen, Todos und Löschen wird bereits an den Server geschrieben. Stage-Einstellungen sowie das Erstellen und Sortieren von Stages werden ebenfalls dauerhaft gespeichert. Änderungen an Boards, Mitgliedern sowie das Löschen von Stages sind in diesem Zwischenstand nur im Arbeitsspeicher sichtbar; ein Neuladen stellt dafür den Datenbankstand wieder her. Ist die API beim Start nicht erreichbar, verwendet der Client weiterhin den lokalen Workspace.
+Der Client lädt dann die zugänglichen Boards aus PostgreSQL. Der vollständige Task-Lebenszyklus einschließlich Erstellen, Bearbeiten, Statusformular, Drag-and-drop, Zuweisen, Todos und Löschen wird bereits an den Server geschrieben. Auch Stage-Einstellungen sowie das Erstellen, Sortieren und Löschen von Stages werden dauerhaft gespeichert. Änderungen an Boards und Mitgliedern sind in diesem Zwischenstand nur im Arbeitsspeicher sichtbar; ein Neuladen stellt dafür den Datenbankstand wieder her. Ist die API beim Start nicht erreichbar, verwendet der Client weiterhin den lokalen Workspace.
 
 ### Bestehenden Workspace prüfen und importieren
 
