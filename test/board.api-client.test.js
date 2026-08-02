@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 
-import { assignApiTask, createApiTask, loadApiWorkspace, moveApiTask, readApiDataSource, syncApiTaskTodos, updateApiTask } from "../src/board/board.api-client.js";
+import { assignApiTask, createApiTask, deleteApiTask, loadApiWorkspace, moveApiTask, readApiDataSource, syncApiTaskTodos, updateApiTask } from "../src/board/board.api-client.js";
 
 describe("Board-API-Client", () => {
   test("aktiviert die API ausschließlich per URL-Opt-in", () => {
@@ -96,6 +96,15 @@ describe("Board-API-Client", () => {
     });
     assert.deepEqual(requestBody, { todos: task.todos, version: 1 });
     assert.equal(saved.version, 2);
+  });
+
+  test("löscht Tasks mit ihrer aktuellen Version", async () => {
+    let received;
+    await deleteApiTask("http://api", "board-id", boardResponse().tasks["task-id"], async (url, options) => {
+      received = { url, method: options.method };
+      return { ok: true, status: 204 };
+    });
+    assert.deepEqual(received, { url: "http://api/api/boards/board-id/tasks/task-id?version=1", method: "DELETE" });
   });
 });
 

@@ -1,6 +1,6 @@
 import { createApp } from "./core/JaDyDoCo.js";
 import { createBoardController } from "./board/board.controller.js";
-import { assignApiTask, createApiTask, loadApiWorkspace, moveApiTask, readApiDataSource, syncApiTaskTodos, updateApiTask } from "./board/board.api-client.js";
+import { assignApiTask, createApiTask, deleteApiTask, loadApiWorkspace, moveApiTask, readApiDataSource, syncApiTaskTodos, updateApiTask } from "./board/board.api-client.js";
 
 const app = createApp("#root");
 const apiSource = readApiDataSource(window.location);
@@ -15,6 +15,7 @@ if (apiSource) {
       createTaskRemote: (boardId, task, stageId) => createApiTask(apiSource, boardId, task, stageId),
       assignTaskRemote: (boardId, task) => assignApiTask(apiSource, boardId, task),
       syncTaskTodosRemote: (boardId, task) => syncApiTaskTodos(apiSource, boardId, task),
+      deleteTaskRemote: (boardId, task) => deleteApiTask(apiSource, boardId, task),
     });
   } catch (error) {
     console.warn("JaDy Board API could not be loaded; using the local workspace.", error);

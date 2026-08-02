@@ -10,6 +10,7 @@
  * @property {(boardId: string, userId: string) => Promise<boolean>} [isBoardMember]
  * @property {(boardId: string, taskId: string, version: number, assigneeId: string|null) => Promise<Record<string, any>|null>} [updateTaskAssignment]
  * @property {(boardId: string, taskId: string, version: number, todos: {id: string, text: string, completed: boolean}[]) => Promise<Record<string, any>|null>} [replaceTaskTodos]
+ * @property {(boardId: string, taskId: string, version: number) => Promise<boolean>} [deleteTask]
  */
 
 /**
@@ -235,6 +236,25 @@ export function createBoardRepository(database) {
         const updated = await client.query(`UPDATE tasks SET version = version + 1, updated_at = now() WHERE id = $1 RETURNING id, version`, [taskId]);
         await client.query("COMMIT");
         return { ...updated.rows[0], todos };
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      } finally { client.release(); }
+    },
+
+    async deleteTask(boardId, taskId, version) {
+      if (!("connect" in database) || typeof database.connect !== "function") throw new Error("Transactions are unavailable.");
+      const client = await database.connect();
+      try {
+        await client.query("BEGIN");
+        const locked = await client.query(`SELECT stage_id, position, version FROM tasks WHERE board_id = $1 AND id = $2 FOR UPDATE`, [boardId, taskId]);
+        const task = locked.rows[0];
+        if (!task || Number(task.version) !== version) { await client.query("ROLLBACK"); return false; }
+        await client.query(`DELETE FROM tasks WHERE board_id = $1 AND id = $2`, [boardId, taskId]);
+        await client.query(`UPDATE tasks SET position = position - 1 WHERE stage_id = $1 AND position > $2`, [task.stage_id, task.position]);
+        await client.query(`UPDATE boards SET version = version + 1, updated_at = now() WHERE id = $1`, [boardId]);
+        await client.query("COMMIT");
+        return true;
       } catch (error) {
         await client.query("ROLLBACK");
         throw error;

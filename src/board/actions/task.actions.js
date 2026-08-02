@@ -231,13 +231,19 @@ export function createTaskActions(context) {
     },
 
     /** @param {string} taskId */
-    deleteTask(taskId) {
+    async deleteTask(taskId) {
       const state = context.state();
       if (!canDeleteTask(state, taskId, context.workspace.activeUserId)) return;
       const undo = createDeleteUndo(state, taskId);
+      const deleted = structuredClone(state.tasks[taskId]);
       removeTask(state, taskId);
+      if (context.deleteTaskRemote) {
+        try { await context.deleteTaskRemote(context.workspace.activeBoardId, deleted); }
+        catch (error) { applyUndo(state, undo); throw error; }
+      }
       if (context.viewState().selectedTaskId === taskId) context.viewState().selectedTaskId = null;
-      context.registerUndo(undo, `${taskId} wurde gelöscht.`);
+      if (context.deleteTaskRemote) context.registerNotice(`${taskId} wurde gelöscht.`);
+      else context.registerUndo(undo, `${taskId} wurde gelöscht.`);
       context.saveState();
       context.render();
     },

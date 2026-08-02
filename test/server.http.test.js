@@ -243,6 +243,18 @@ describe("Task-Schreib-API", () => {
     assert.equal(response.status, 200);
     assert.deepEqual((await response.json()).task, { id: taskId, todos: [], version: 2 });
   });
+
+  test("löscht Tasks versioniert über HTTP", async () => {
+    const boardService = {
+      async listBoards() { return []; }, async getBoard() { return null; }, async updateTask() { return { status: /** @type {const} */ ("not_found") }; },
+      async moveTask() { return { status: /** @type {const} */ ("not_found") }; }, async createTask() { return { status: /** @type {const} */ ("not_found") }; },
+      async assignTask() { return { status: /** @type {const} */ ("not_found") }; }, async syncTaskTodos() { return { status: /** @type {const} */ ("not_found") }; },
+      async deleteTask(_board, _task, _user, version) { assert.equal(version, "2"); return { status: /** @type {const} */ ("deleted") }; },
+    };
+    const baseUrl = await listenApi({ boardService, currentUserId: userId });
+    const response = await fetch(`${baseUrl}/api/boards/${boardId}/tasks/${taskId}?version=2`, { method: "DELETE" });
+    assert.equal(response.status, 204);
+  });
 });
 
 /**

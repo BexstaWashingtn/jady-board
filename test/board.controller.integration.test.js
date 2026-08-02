@@ -578,6 +578,25 @@ describe("Board-Controller-Integration", () => {
     assert.equal(controller.getState().tasks["KAN-18"].version, 3);
   });
 
+  test("löscht Tasks im API-Modus ohne lokales Undo", async () => {
+    const state = createInitialBoardState();
+    state.tasks["KAN-18"].version = 2;
+    let deletedVersion = 0;
+    const workspace = {
+      activeBoardId: "api-board", boards: { "api-board": state }, activeUserId: "user-1",
+      users: { "user-1": { id: "user-1", name: "API User", initials: "AU", preferences: { theme: /** @type {const} */ ("system") } } },
+    };
+    const controller = createBoardController(createApp("#root"), {
+      workspace, persist: () => true, seedShowcase: false,
+      async deleteTaskRemote(_boardId, task) { deletedVersion = task.version; },
+    });
+    await controller.actions.deleteTask("KAN-18");
+    assert.equal(deletedVersion, 2);
+    assert.equal(controller.getState().tasks["KAN-18"], undefined);
+    assert.equal(document.querySelector(".undo-toast"), null);
+    controller.destroy();
+  });
+
   test("erlaubt Mitgliedern freie Tasks zu übernehmen und wieder freizugeben", () => {
     const controller = startController();
     controller.actions.switchUser("user-demo-lukas");

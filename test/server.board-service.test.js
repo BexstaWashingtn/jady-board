@@ -174,6 +174,20 @@ describe("Board-Service", () => {
     assert.equal(result.status === "updated" && result.task.todos[0].text, "Testen");
     assert.equal(result.status === "updated" && result.task.version, 3);
   });
+
+  test("löscht Tasks ausschließlich als Owner und mit aktueller Version", async () => {
+    let deleted = false;
+    const repository = {
+      async listForUser() { return []; }, async findForUser() { return null; },
+      async findTaskForUser() { return { id: TASK_ID, version: 2, role: "owner" }; },
+      async deleteTask() { deleted = true; return true; },
+    };
+    const service = createBoardService(repository);
+    assert.deepEqual(await service.deleteTask(BOARD_ID, TASK_ID, USER_ID, "2"), { status: "deleted" });
+    assert.equal(deleted, true);
+    repository.findTaskForUser = async () => ({ id: TASK_ID, version: 2, role: "member" });
+    assert.equal((await service.deleteTask(BOARD_ID, TASK_ID, USER_ID, 2)).status, "forbidden");
+  });
 });
 
 const USER_ID = "8acf3017-cf6e-589b-bd47-a1d8ccec16a8";

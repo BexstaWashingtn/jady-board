@@ -9,6 +9,7 @@ import { randomUUID } from "node:crypto";
  * @property {(boardId: string, userId: string, input: unknown) => Promise<{status: "created", task: Record<string, any>}|{status: "not_found"|"forbidden"}|{status: "rejected", code: string, message: string}|{status: "invalid", message: string}>} createTask
  * @property {(boardId: string, taskId: string, userId: string, input: unknown) => Promise<{status: "updated", task: Record<string, any>}|{status: "not_found"|"forbidden"|"conflict"}|{status: "invalid", message: string}>} assignTask
  * @property {(boardId: string, taskId: string, userId: string, input: unknown) => Promise<{status: "updated", task: Record<string, any>}|{status: "not_found"|"forbidden"|"conflict"}|{status: "invalid", message: string}>} syncTaskTodos
+ * @property {(boardId: string, taskId: string, userId: string, version: unknown) => Promise<{status: "deleted"|"not_found"|"forbidden"|"conflict"}|{status: "invalid", message: string}>} deleteTask
  */
 
 /**
@@ -122,6 +123,17 @@ export function createBoardService(repository) {
       const updated = await repository.replaceTaskTodos(boardId, taskId, parsed.version, todos);
       if (!updated) return { status: "conflict" };
       return { status: "updated", task: { id: taskId, todos: updated.todos, version: Number(updated.version) } };
+    },
+
+    async deleteTask(boardId, taskId, userId, version) {
+      const parsedVersion = Number(version);
+      if (!Number.isInteger(parsedVersion) || parsedVersion < 1) return { status: "invalid", message: "Task version must be a positive integer." };
+      if (!repository.findTaskForUser || !repository.deleteTask) throw new Error("Task deletion is unavailable.");
+      const current = await repository.findTaskForUser(boardId, taskId, userId);
+      if (!current) return { status: "not_found" };
+      if (current.role !== "owner") return { status: "forbidden" };
+      if (Number(current.version) !== parsedVersion) return { status: "conflict" };
+      return await repository.deleteTask(boardId, taskId, parsedVersion) ? { status: "deleted" } : { status: "conflict" };
     },
   };
 }

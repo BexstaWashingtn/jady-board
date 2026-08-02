@@ -2,7 +2,7 @@ const JSON_HEADERS = {
   "Content-Type": "application/json; charset=utf-8",
   "Cache-Control": "no-store",
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, PATCH, OPTIONS",
+  "Access-Control-Allow-Methods": "GET, POST, PATCH, DELETE, OPTIONS",
   "Access-Control-Allow-Headers": "Accept, Content-Type",
 };
 
@@ -101,6 +101,23 @@ export function createApiHandler({ database, boardService, currentUserId = null 
       } catch {
         sendJson(response, 500, internalError());
       }
+      return;
+    }
+
+    const deleteTaskMatch = method === "DELETE" ? url.pathname.match(/^\/api\/boards\/([^/]+)\/tasks\/([^/]+)$/) : null;
+    if (deleteTaskMatch) {
+      if (!boardService || !currentUserId) { sendJson(response, 503, identityUnavailable()); return; }
+      const boardId = decodeURIComponent(deleteTaskMatch[1]);
+      const taskId = decodeURIComponent(deleteTaskMatch[2]);
+      if (!isUuid(boardId) || !isUuid(taskId)) { sendJson(response, 400, { error: { code: "INVALID_RESOURCE_ID", message: "Board and task IDs must be UUIDs." } }); return; }
+      try {
+        const result = await boardService.deleteTask(boardId, taskId, currentUserId, url.searchParams.get("version"));
+        if (result.status === "deleted") { response.writeHead(204, JSON_HEADERS); response.end(); }
+        else if (result.status === "invalid") sendJson(response, 400, { error: { code: "INVALID_TASK_VERSION", message: result.message } });
+        else if (result.status === "forbidden") sendJson(response, 403, { error: { code: "TASK_DELETE_FORBIDDEN", message: "Task deletion is not permitted." } });
+        else if (result.status === "conflict") sendJson(response, 409, { error: { code: "TASK_VERSION_CONFLICT", message: "Task has been changed by another request." } });
+        else sendJson(response, 404, { error: { code: "TASK_NOT_FOUND", message: "Task not found." } });
+      } catch { sendJson(response, 500, internalError()); }
       return;
     }
 

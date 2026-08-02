@@ -33,6 +33,7 @@
  * @property {((boardId: string, task: import("../board.state.js").BoardTask, stageId: string) => Promise<import("../board.state.js").BoardTask>)|undefined} createTaskRemote
  * @property {((boardId: string, task: import("../board.state.js").BoardTask) => Promise<{assigneeId: string|null, version: number}>)|undefined} assignTaskRemote
  * @property {((boardId: string, task: import("../board.state.js").BoardTask) => Promise<{todos: import("../board.state.js").TaskTodo[], version: number}>)|undefined} syncTaskTodosRemote
+ * @property {((boardId: string, task: import("../board.state.js").BoardTask) => Promise<void>)|undefined} deleteTaskRemote
  */
 
 export {};
