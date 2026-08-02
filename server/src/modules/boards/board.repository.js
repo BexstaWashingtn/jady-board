@@ -2,6 +2,8 @@
  * @typedef {Object} BoardRepository
  * @property {(userId: string) => Promise<Record<string, any>[]>} listForUser
  * @property {(boardId: string, userId: string) => Promise<Record<string, any>|null>} findForUser
+ * @property {(boardId: string, taskId: string, userId: string) => Promise<Record<string, any>|null>} [findTaskForUser]
+ * @property {(boardId: string, taskId: string, version: number, changes: {title: string, category: string, priority: string, dueDate: string|null}) => Promise<Record<string, any>|null>} [updateTaskMetadata]
  */
 
 /**
@@ -80,6 +82,27 @@ export function createBoardRepository(database) {
         todos: todos.rows,
         transitions: transitions.rows,
       };
+    },
+
+    async findTaskForUser(boardId, taskId, userId) {
+      const result = await database.query(`
+        SELECT t.id, t.assignee_id, t.version, bm.role
+        FROM tasks t
+        JOIN board_members bm ON bm.board_id = t.board_id AND bm.user_id = $3
+        WHERE t.board_id = $1 AND t.id = $2
+      `, [boardId, taskId, userId]);
+      return result.rows[0] ?? null;
+    },
+
+    async updateTaskMetadata(boardId, taskId, version, changes) {
+      const result = await database.query(`
+        UPDATE tasks
+        SET title = $4, category = $5, priority = $6, due_date = $7,
+          version = version + 1, updated_at = now()
+        WHERE board_id = $1 AND id = $2 AND version = $3
+        RETURNING id, title, category, priority, due_date::text, assignee_id, version
+      `, [boardId, taskId, version, changes.title, changes.category, changes.priority, changes.dueDate]);
+      return result.rows[0] ?? null;
     },
   };
 }

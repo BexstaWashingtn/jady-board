@@ -130,6 +130,49 @@ describe("Board-Lese-API", () => {
   });
 });
 
+describe("Task-Schreib-API", () => {
+  const userId = "8acf3017-cf6e-589b-bd47-a1d8ccec16a8";
+  const boardId = "46ed3b71-86cb-5eb7-a01e-dd5885e41c6a";
+  const taskId = "912e8124-aa18-5848-bac7-3486be614b78";
+
+  test("aktualisiert Task-Metadaten und beantwortet CORS-Preflights", async () => {
+    let received;
+    const boardService = {
+      async listBoards() { return []; }, async getBoard() { return null; },
+      async updateTask(...args) {
+        received = args;
+        return { status: /** @type {const} */ ("updated"), task: { id: taskId, title: "Neu", version: 2 } };
+      },
+    };
+    const baseUrl = await listenApi({ boardService, currentUserId: userId });
+    const preflight = await fetch(`${baseUrl}/api/boards/${boardId}/tasks/${taskId}`, { method: "OPTIONS" });
+    assert.equal(preflight.status, 204);
+    assert.match(preflight.headers.get("access-control-allow-methods") ?? "", /PATCH/);
+    const body = { title: "Neu", category: "Core", priority: "high", dueDate: null, version: 1 };
+    const response = await fetch(`${baseUrl}/api/boards/${boardId}/tasks/${taskId}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+    });
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), { task: { id: taskId, title: "Neu", version: 2 } });
+    assert.deepEqual(received, [boardId, taskId, userId, body]);
+  });
+
+  test("liefert stabile Fehler für ungültige Requests und Versionskonflikte", async () => {
+    const boardService = {
+      async listBoards() { return []; }, async getBoard() { return null; },
+      async updateTask() { return { status: /** @type {const} */ ("conflict") }; },
+    };
+    const baseUrl = await listenApi({ boardService, currentUserId: userId });
+    const invalidId = await fetch(`${baseUrl}/api/boards/no/tasks/${taskId}`, { method: "PATCH", body: "{}" });
+    assert.equal(invalidId.status, 400);
+    const invalidJson = await fetch(`${baseUrl}/api/boards/${boardId}/tasks/${taskId}`, { method: "PATCH", body: "{" });
+    assert.equal(invalidJson.status, 400);
+    const conflict = await fetch(`${baseUrl}/api/boards/${boardId}/tasks/${taskId}`, { method: "PATCH", body: "{}" });
+    assert.equal(conflict.status, 409);
+    assert.equal((await conflict.json()).error.code, "TASK_VERSION_CONFLICT");
+  });
+});
+
 /**
  * @param {{query: (sql: unknown) => Promise<unknown>}} database
  */

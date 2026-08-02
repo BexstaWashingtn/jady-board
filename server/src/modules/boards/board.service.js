@@ -2,6 +2,7 @@
  * @typedef {Object} BoardService
  * @property {(userId: string) => Promise<Record<string, any>[]>} listBoards
  * @property {(boardId: string, userId: string) => Promise<Record<string, any>|null>} getBoard
+ * @property {(boardId: string, taskId: string, userId: string, input: unknown) => Promise<{status: "updated", task: Record<string, any>}|{status: "not_found"|"forbidden"|"conflict"}|{status: "invalid", message: string}>} updateTask
  */
 
 /**
@@ -29,6 +30,46 @@ export function createBoardService(repository) {
       if (!data) return null;
       return mapBoard(data);
     },
+
+    async updateTask(boardId, taskId, userId, input) {
+      const parsed = parseTaskUpdate(input);
+      if ("message" in parsed) return { status: "invalid", message: parsed.message };
+      if (!repository.findTaskForUser || !repository.updateTaskMetadata) throw new Error("Task writes are unavailable.");
+      const current = await repository.findTaskForUser(boardId, taskId, userId);
+      if (!current) return { status: "not_found" };
+      if (current.role !== "owner" && String(current.assignee_id ?? "") !== userId) return { status: "forbidden" };
+      if (Number(current.version) !== parsed.version) return { status: "conflict" };
+      const updated = await repository.updateTaskMetadata(boardId, taskId, parsed.version, parsed);
+      if (!updated) return { status: "conflict" };
+      return { status: "updated", task: mapUpdatedTask(updated) };
+    },
+  };
+}
+
+/**
+ * @param {unknown} input
+ * @returns {{message: string}|{title: string, category: string, priority: string, dueDate: string|null, version: number}}
+ */
+function parseTaskUpdate(input) {
+  if (!input || typeof input !== "object" || Array.isArray(input)) return { message: "A JSON object is required." };
+  const value = /** @type {Record<string, unknown>} */ (input);
+  const title = typeof value.title === "string" ? value.title.trim() : "";
+  const category = typeof value.category === "string" ? value.category.trim() : "";
+  const dueDate = value.dueDate === null || value.dueDate === "" ? null : value.dueDate;
+  if (!title) return { message: "Task title is required." };
+  if (!category) return { message: "Task category is required." };
+  if (!(["low", "medium", "high"].includes(String(value.priority)))) return { message: "Task priority is invalid." };
+  if (!Number.isInteger(value.version) || Number(value.version) < 1) return { message: "Task version must be a positive integer." };
+  if (dueDate !== null && (typeof dueDate !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(dueDate))) return { message: "Task due date is invalid." };
+  return { title, category, priority: String(value.priority), dueDate, version: Number(value.version) };
+}
+
+/** @param {Record<string, any>} row */
+function mapUpdatedTask(row) {
+  return {
+    id: String(row.id), title: String(row.title), category: String(row.category),
+    priority: String(row.priority), dueDate: row.due_date ? String(row.due_date) : null,
+    assigneeId: row.assignee_id ? String(row.assignee_id) : null, version: Number(row.version),
   };
 }
 

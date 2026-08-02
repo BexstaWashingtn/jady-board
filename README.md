@@ -233,6 +233,7 @@ Die API verwendet standardmäßig Port `3000`:
 - `GET /api/ready` prüft zusätzlich die PostgreSQL-Verbindung.
 - `GET /api/boards` listet die Boards des mit `DEV_USER_ID` konfigurierten Entwicklungsbenutzers.
 - `GET /api/boards/:id` liefert ein zugängliches Board einschließlich Mitglieder, Spalten, Tasks, Todos und Übergänge.
+- `PATCH /api/boards/:boardId/tasks/:taskId` aktualisiert Titel, Kategorie, Priorität und Fälligkeit eines Tasks. Das Feld `version` schützt vor dem Überschreiben paralleler Änderungen.
 
 `DEV_USER_ID` ist eine vorübergehende Entwicklungsidentität und muss der UUID eines importierten Benutzers entsprechen. Sie ersetzt keine spätere Authentifizierung.
 
@@ -269,7 +270,7 @@ Das initiale relationale Schema trennt Benutzer, Präferenzen, Boards, Mitgliede
 
 ## Aktuelle Grenzen
 
-- Der Browser-Client arbeitet standardmäßig weiterhin mit seinem lokalen Workspace. Die Board-API kann optional als lesende Datenquelle aktiviert werden; Änderungen im API-Modus werden noch nicht an den Server geschrieben und gehen beim Neuladen verloren.
+- Der Browser-Client arbeitet standardmäßig weiterhin mit seinem lokalen Workspace. Die Board-API kann optional als lesende Datenquelle aktiviert werden; der erste Schreibendpunkt für Task-Metadaten ist serverseitig vorhanden, aber noch nicht mit den Client-Aktionen verbunden. Änderungen im API-Modus gehen deshalb beim Neuladen weiterhin verloren.
 - Es gibt noch keine Anmeldung; die lesende API begrenzt den Zugriff vorläufig über `DEV_USER_ID`.
 - Gleichzeitige Bearbeitung durch mehrere Personen wird nicht unterstützt.
 - Automatische oder zeitgesteuerte Backups sind nicht vorhanden; Exporte müssen manuell ausgelöst werden.

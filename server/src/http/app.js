@@ -2,6 +2,8 @@ const JSON_HEADERS = {
   "Content-Type": "application/json; charset=utf-8",
   "Cache-Control": "no-store",
   "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, PATCH, OPTIONS",
+  "Access-Control-Allow-Headers": "Accept, Content-Type",
 };
 
 /**
@@ -16,6 +18,12 @@ export function createApiHandler({ database, boardService, currentUserId = null 
   return async function apiHandler(request, response) {
     const method = request.method ?? "GET";
     const url = new URL(request.url ?? "/", "http://localhost");
+
+    if (method === "OPTIONS") {
+      response.writeHead(204, JSON_HEADERS);
+      response.end();
+      return;
+    }
 
     if (method === "GET" && url.pathname === "/api/health") {
       sendJson(response, 200, { status: "ok" });
@@ -74,10 +82,52 @@ export function createApiHandler({ database, boardService, currentUserId = null 
       return;
     }
 
+    const taskMatch = method === "PATCH" ? url.pathname.match(/^\/api\/boards\/([^/]+)\/tasks\/([^/]+)$/) : null;
+    if (taskMatch) {
+      if (!boardService || !currentUserId) {
+        sendJson(response, 503, identityUnavailable());
+        return;
+      }
+      const boardId = decodeURIComponent(taskMatch[1]);
+      const taskId = decodeURIComponent(taskMatch[2]);
+      if (!isUuid(boardId) || !isUuid(taskId)) {
+        sendJson(response, 400, { error: { code: "INVALID_RESOURCE_ID", message: "Board and task IDs must be UUIDs." } });
+        return;
+      }
+      let body;
+      try {
+        body = await readJson(request);
+      } catch {
+        sendJson(response, 400, { error: { code: "INVALID_JSON", message: "A valid JSON request body is required." } });
+        return;
+      }
+      try {
+        const result = await boardService.updateTask(boardId, taskId, currentUserId, body);
+        if (result.status === "updated") sendJson(response, 200, { task: result.task });
+        else if (result.status === "invalid") sendJson(response, 400, { error: { code: "INVALID_TASK", message: result.message } });
+        else if (result.status === "forbidden") sendJson(response, 403, { error: { code: "TASK_UPDATE_FORBIDDEN", message: "Task update is not permitted." } });
+        else if (result.status === "conflict") sendJson(response, 409, { error: { code: "TASK_VERSION_CONFLICT", message: "Task has been changed by another request." } });
+        else sendJson(response, 404, { error: { code: "TASK_NOT_FOUND", message: "Task not found." } });
+      } catch {
+        sendJson(response, 500, internalError());
+      }
+      return;
+    }
+
     sendJson(response, 404, {
       error: { code: "NOT_FOUND", message: "The requested API resource does not exist." },
     });
   };
+}
+
+/** @param {import("node:http").IncomingMessage} request @returns {Promise<unknown>} */
+async function readJson(request) {
+  let raw = "";
+  for await (const chunk of request) {
+    raw += chunk;
+    if (raw.length > 64 * 1024) throw new Error("Request body too large.");
+  }
+  return JSON.parse(raw);
 }
 
 function identityUnavailable() {

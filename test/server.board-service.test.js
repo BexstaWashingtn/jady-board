@@ -53,6 +53,40 @@ describe("Board-Service", () => {
     });
     assert.equal(await service.getBoard(BOARD_ID, USER_ID), null);
   });
+  test("aktualisiert Task-Metadaten mit optimistischer Versionsprüfung", async () => {
+    let received;
+    const service = createBoardService({
+      async listForUser() { return []; }, async findForUser() { return null; },
+      async findTaskForUser() { return { id: TASK_ID, assignee_id: USER_ID, version: 4, role: "member" }; },
+      async updateTaskMetadata(boardId, taskId, version, changes) {
+        received = { boardId, taskId, version, changes };
+        return { id: taskId, ...changes, due_date: changes.dueDate, assignee_id: USER_ID, version: 5 };
+      },
+    });
+    const result = await service.updateTask(BOARD_ID, TASK_ID, USER_ID, {
+      title: " API schreiben ", category: "Backend", priority: "high", dueDate: "2026-08-15", version: 4,
+    });
+    assert.equal(result.status, "updated");
+    assert.equal(result.status === "updated" && result.task.version, 5);
+    assert.deepEqual(received, {
+      boardId: BOARD_ID, taskId: TASK_ID, version: 4,
+      changes: { title: "API schreiben", category: "Backend", priority: "high", dueDate: "2026-08-15", version: 4 },
+    });
+  });
+
+  test("weist ungültige, unberechtigte und veraltete Task-Updates zurück", async () => {
+    const repository = {
+      async listForUser() { return []; }, async findForUser() { return null; },
+      async findTaskForUser() { return { id: TASK_ID, assignee_id: null, version: 3, role: "member" }; },
+      async updateTaskMetadata() { throw new Error("must not update"); },
+    };
+    const service = createBoardService(repository);
+    const valid = { title: "Task", category: "Core", priority: "medium", dueDate: null, version: 3 };
+    assert.equal((await service.updateTask(BOARD_ID, TASK_ID, USER_ID, { ...valid, title: "" })).status, "invalid");
+    assert.equal((await service.updateTask(BOARD_ID, TASK_ID, USER_ID, valid)).status, "forbidden");
+    repository.findTaskForUser = async () => ({ id: TASK_ID, assignee_id: USER_ID, version: 4, role: "member" });
+    assert.equal((await service.updateTask(BOARD_ID, TASK_ID, USER_ID, valid)).status, "conflict");
+  });
 });
 
 const USER_ID = "8acf3017-cf6e-589b-bd47-a1d8ccec16a8";

@@ -64,6 +64,30 @@ test("liefert importierte Boards durch den vollständigen Lese-API-Stack", { ski
   assert.equal(board.columns[0].taskIds.length, 1);
 });
 
+test("persistiert Task-Metadaten mit Versionsschutz in PostgreSQL", { skip: !database }, async () => {
+  const detailResponse = await fetch(`${baseUrl}/api/boards/${boardId}`);
+  const { board } = await detailResponse.json();
+  const task = Object.values(board.tasks)[0];
+  const response = await fetch(`${baseUrl}/api/boards/${boardId}/tasks/${task.id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      title: "Schreibpfad getestet", category: "Integration", priority: "medium",
+      dueDate: null, version: task.version,
+    }),
+  });
+  assert.equal(response.status, 200);
+  const updated = (await response.json()).task;
+  assert.equal(updated.title, "Schreibpfad getestet");
+  assert.equal(updated.version, task.version + 1);
+
+  const staleResponse = await fetch(`${baseUrl}/api/boards/${boardId}/tasks/${task.id}`, {
+    method: "PATCH", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ title: "Veraltet", category: "Integration", priority: "low", dueDate: null, version: task.version }),
+  });
+  assert.equal(staleResponse.status, 409);
+});
+
 async function cleanup() {
   if (!database) return;
   await database.query("DELETE FROM workspace_imports WHERE fingerprint = $1", [plan.fingerprint]);
