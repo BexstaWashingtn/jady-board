@@ -171,6 +171,28 @@ describe("Task-Schreib-API", () => {
     assert.equal(conflict.status, 409);
     assert.equal((await conflict.json()).error.code, "TASK_VERSION_CONFLICT");
   });
+
+  test("verschiebt Tasks und reicht Workflow-Ablehnungen durch", async () => {
+    let rejected = false;
+    const boardService = {
+      async listBoards() { return []; }, async getBoard() { return null; },
+      async updateTask() { return { status: /** @type {const} */ ("not_found") }; },
+      async moveTask(board, task, user, body) {
+        if (rejected) return { status: /** @type {const} */ ("rejected"), code: "WIP_LIMIT_REACHED", message: "Full." };
+        assert.deepEqual([board, task, user, body], [boardId, taskId, userId, { stageId: "c358d08d-6fdd-5752-8fe2-a4004c0e5ad9", targetIndex: 2, version: 3 }]);
+        return { status: /** @type {const} */ ("moved"), task: { id: taskId, stageId: body.stageId, position: 2, version: 4 } };
+      },
+    };
+    const baseUrl = await listenApi({ boardService, currentUserId: userId });
+    const options = { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ stageId: "c358d08d-6fdd-5752-8fe2-a4004c0e5ad9", targetIndex: 2, version: 3 }) };
+    const response = await fetch(`${baseUrl}/api/boards/${boardId}/tasks/${taskId}/position`, options);
+    assert.equal(response.status, 200);
+    assert.equal((await response.json()).task.version, 4);
+    rejected = true;
+    const limited = await fetch(`${baseUrl}/api/boards/${boardId}/tasks/${taskId}/position`, options);
+    assert.equal(limited.status, 422);
+    assert.equal((await limited.json()).error.code, "WIP_LIMIT_REACHED");
+  });
 });
 
 /**

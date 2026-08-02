@@ -70,6 +70,36 @@ export async function updateApiTask(baseUrl, boardId, task, request = fetch) {
   return body.task;
 }
 
+/**
+ * @param {string} baseUrl
+ * @param {string} boardId
+ * @param {import("./board.state.js").BoardTask} task
+ * @param {string} stageId
+ * @param {number} targetIndex
+ * @param {typeof fetch} [request]
+ * @returns {Promise<{id: string, stageId: string, position: number, version: number}>}
+ */
+export async function moveApiTask(baseUrl, boardId, task, stageId, targetIndex, request = fetch) {
+  if (!Number.isInteger(task.version) || Number(task.version) < 1) throw new Error("Der Task besitzt keine gültige Server-Version.");
+  const response = await request(`${baseUrl}/api/boards/${encodeURIComponent(boardId)}/tasks/${encodeURIComponent(task.id)}/position`, {
+    method: "PATCH", headers: { Accept: "application/json", "Content-Type": "application/json" },
+    body: JSON.stringify({ stageId, targetIndex, version: task.version }),
+  });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    /** @type {Record<string, string>} */
+    const messages = {
+      TASK_VERSION_CONFLICT: "Der Task wurde zwischenzeitlich geändert. Bitte lade das Board neu.",
+      TRANSITION_NOT_ALLOWED: "Der konfigurierte Workflow erlaubt diesen Übergang nicht.",
+      OPEN_TODOS: "Vor diesem Übergang müssen alle Todos erledigt sein.",
+      WIP_LIMIT_REACHED: "Die Ziel-Stage hat ihr WIP-Limit erreicht.",
+    };
+    throw new Error(messages[body?.error?.code] ?? String(body?.error?.message ?? `Task konnte nicht verschoben werden (${response.status}).`));
+  }
+  if (!body.task || Number(body.task.version) < 1) throw new Error("Die Board-API hat eine ungültige Verschiebung zurückgegeben.");
+  return body.task;
+}
+
 /** @param {typeof fetch} request @param {string} url @returns {Promise<Record<string, any>>} */
 async function getJson(request, url) {
   const response = await request(url, { headers: { Accept: "application/json" } });

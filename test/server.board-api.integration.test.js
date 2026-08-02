@@ -88,6 +88,26 @@ test("persistiert Task-Metadaten mit Versionsschutz in PostgreSQL", { skip: !dat
   assert.equal(staleResponse.status, 409);
 });
 
+test("verschiebt einen Task transaktional in PostgreSQL", { skip: !database }, async () => {
+  const detailResponse = await fetch(`${baseUrl}/api/boards/${boardId}`);
+  const { board } = await detailResponse.json();
+  const task = Object.values(board.tasks)[0];
+  const target = board.columns[1];
+  const response = await fetch(`${baseUrl}/api/boards/${boardId}/tasks/${task.id}/position`, {
+    method: "PATCH", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ stageId: target.id, targetIndex: 0, version: task.version }),
+  });
+  assert.equal(response.status, 200);
+  const moved = (await response.json()).task;
+  assert.equal(moved.stageId, target.id);
+  assert.equal(moved.position, 0);
+  assert.equal(moved.version, task.version + 1);
+
+  const refreshed = (await (await fetch(`${baseUrl}/api/boards/${boardId}`)).json()).board;
+  assert.deepEqual(refreshed.columns[1].taskIds, [task.id]);
+  assert.equal(refreshed.columns[0].taskIds.includes(task.id), false);
+});
+
 async function cleanup() {
   if (!database) return;
   await database.query("DELETE FROM workspace_imports WHERE fingerprint = $1", [plan.fingerprint]);

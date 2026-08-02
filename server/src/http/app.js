@@ -82,6 +82,34 @@ export function createApiHandler({ database, boardService, currentUserId = null 
       return;
     }
 
+    const moveMatch = method === "PATCH" ? url.pathname.match(/^\/api\/boards\/([^/]+)\/tasks\/([^/]+)\/position$/) : null;
+    if (moveMatch) {
+      if (!boardService || !currentUserId) { sendJson(response, 503, identityUnavailable()); return; }
+      const boardId = decodeURIComponent(moveMatch[1]);
+      const taskId = decodeURIComponent(moveMatch[2]);
+      if (!isUuid(boardId) || !isUuid(taskId)) {
+        sendJson(response, 400, { error: { code: "INVALID_RESOURCE_ID", message: "Board and task IDs must be UUIDs." } });
+        return;
+      }
+      let body;
+      try { body = await readJson(request); } catch {
+        sendJson(response, 400, { error: { code: "INVALID_JSON", message: "A valid JSON request body is required." } });
+        return;
+      }
+      try {
+        const result = await boardService.moveTask(boardId, taskId, currentUserId, body);
+        if (result.status === "moved") sendJson(response, 200, { task: result.task });
+        else if (result.status === "invalid") sendJson(response, 400, { error: { code: "INVALID_TASK_MOVE", message: result.message } });
+        else if (result.status === "forbidden") sendJson(response, 403, { error: { code: "TASK_MOVE_FORBIDDEN", message: "Task move is not permitted." } });
+        else if (result.status === "conflict") sendJson(response, 409, { error: { code: "TASK_VERSION_CONFLICT", message: "Task has been changed by another request." } });
+        else if (result.status === "rejected") sendJson(response, 422, { error: { code: result.code, message: result.message } });
+        else sendJson(response, 404, { error: { code: "TASK_NOT_FOUND", message: "Task or target stage not found." } });
+      } catch {
+        sendJson(response, 500, internalError());
+      }
+      return;
+    }
+
     const taskMatch = method === "PATCH" ? url.pathname.match(/^\/api\/boards\/([^/]+)\/tasks\/([^/]+)$/) : null;
     if (taskMatch) {
       if (!boardService || !currentUserId) {

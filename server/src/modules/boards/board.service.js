@@ -3,6 +3,7 @@
  * @property {(userId: string) => Promise<Record<string, any>[]>} listBoards
  * @property {(boardId: string, userId: string) => Promise<Record<string, any>|null>} getBoard
  * @property {(boardId: string, taskId: string, userId: string, input: unknown) => Promise<{status: "updated", task: Record<string, any>}|{status: "not_found"|"forbidden"|"conflict"}|{status: "invalid", message: string}>} updateTask
+ * @property {(boardId: string, taskId: string, userId: string, input: unknown) => Promise<{status: "moved", task: Record<string, any>}|{status: "not_found"|"forbidden"|"conflict"}|{status: "rejected", code: string, message: string}|{status: "invalid", message: string}>} moveTask
  */
 
 /**
@@ -43,7 +44,42 @@ export function createBoardService(repository) {
       if (!updated) return { status: "conflict" };
       return { status: "updated", task: mapUpdatedTask(updated) };
     },
+
+    async moveTask(boardId, taskId, userId, input) {
+      const parsed = parseTaskMove(input);
+      if ("message" in parsed) return { status: "invalid", message: parsed.message };
+      if (!repository.findTaskMoveContext || !repository.moveTask) throw new Error("Task moves are unavailable.");
+      const current = await repository.findTaskMoveContext(boardId, taskId, userId, parsed.stageId);
+      if (!current || !current.target_stage_id) return { status: "not_found" };
+      if (current.role !== "owner" && String(current.assignee_id ?? "") !== userId) return { status: "forbidden" };
+      if (Number(current.version) !== parsed.version) return { status: "conflict" };
+      if (String(current.stage_id) === parsed.stageId) {
+        return { status: "moved", task: { id: taskId, stageId: parsed.stageId, position: Number(current.position ?? 0), version: parsed.version } };
+      }
+      if (!current.transition_allowed) return { status: "rejected", code: "TRANSITION_NOT_ALLOWED", message: "The configured workflow does not allow this transition." };
+      if (current.require_completed_todos && Number(current.open_todo_count) > 0) return { status: "rejected", code: "OPEN_TODOS", message: "All todos must be completed before this transition." };
+      if (current.wip_limit_mode === "strict" && current.wip_limit !== null && Number(current.target_count) >= Number(current.wip_limit)) {
+        return { status: "rejected", code: "WIP_LIMIT_REACHED", message: "The target stage has reached its WIP limit." };
+      }
+      const targetIndex = Math.min(parsed.targetIndex ?? Number(current.target_count), Number(current.target_count));
+      const moved = await repository.moveTask(boardId, taskId, parsed.stageId, targetIndex, parsed.version);
+      if (!moved) return { status: "conflict" };
+      return { status: "moved", task: { id: String(moved.id), stageId: String(moved.stage_id), position: Number(moved.position), version: Number(moved.version) } };
+    },
   };
+}
+
+/**
+ * @param {unknown} input
+ * @returns {{message: string}|{stageId: string, targetIndex: number|null, version: number}}
+ */
+function parseTaskMove(input) {
+  if (!input || typeof input !== "object" || Array.isArray(input)) return { message: "A JSON object is required." };
+  const value = /** @type {Record<string, unknown>} */ (input);
+  if (typeof value.stageId !== "string" || !value.stageId.trim()) return { message: "Target stage is required." };
+  if (!Number.isInteger(value.version) || Number(value.version) < 1) return { message: "Task version must be a positive integer." };
+  if (value.targetIndex !== undefined && (!Number.isInteger(value.targetIndex) || Number(value.targetIndex) < 0)) return { message: "Target index must be a non-negative integer." };
+  return { stageId: value.stageId, targetIndex: value.targetIndex === undefined ? null : Number(value.targetIndex), version: Number(value.version) };
 }
 
 /**

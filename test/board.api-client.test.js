@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 
-import { loadApiWorkspace, readApiDataSource, updateApiTask } from "../src/board/board.api-client.js";
+import { loadApiWorkspace, moveApiTask, readApiDataSource, updateApiTask } from "../src/board/board.api-client.js";
 
 describe("Board-API-Client", () => {
   test("aktiviert die API ausschließlich per URL-Opt-in", () => {
@@ -52,6 +52,17 @@ describe("Board-API-Client", () => {
       updateApiTask("http://api", "board-id", task, async () => response({ error: { code: "TASK_VERSION_CONFLICT" } }, 409)),
       /zwischenzeitlich geändert/,
     );
+  });
+
+  test("verschiebt Tasks mit Version und Zielposition", async () => {
+    const task = boardResponse().tasks["task-id"];
+    let requestBody;
+    const moved = await moveApiTask("http://api", "board-id", task, "done", 2, async (_url, options) => {
+      requestBody = JSON.parse(options.body);
+      return response({ task: { id: "task-id", stageId: "done", position: 2, version: 2 } });
+    });
+    assert.deepEqual(requestBody, { stageId: "done", targetIndex: 2, version: 1 });
+    assert.deepEqual(moved, { id: "task-id", stageId: "done", position: 2, version: 2 });
   });
 });
 

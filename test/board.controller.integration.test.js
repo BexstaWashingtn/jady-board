@@ -483,6 +483,34 @@ describe("Board-Controller-Integration", () => {
     controller.destroy();
   });
 
+  test("persistiert Statusänderungen aus dem Task-Dialog im API-Modus", async () => {
+    const state = createInitialBoardState();
+    state.tasks["KAN-18"].version = 3;
+    let received;
+    const workspace = {
+      activeBoardId: "api-board", boards: { "api-board": state }, activeUserId: "user-1",
+      users: { "user-1": { id: "user-1", name: "API User", initials: "AU", preferences: { theme: /** @type {const} */ ("system") } } },
+    };
+    const controller = createBoardController(createApp("#root"), {
+      workspace, persist: () => true, seedShowcase: false,
+      async moveTaskRemote(boardId, task, stageId, targetIndex) {
+        received = { boardId, taskId: task.id, stageId, targetIndex, version: task.version };
+        return { version: 4 };
+      },
+    });
+    taskCard("KAN-18").click();
+    const form = document.querySelector(".task-status-form");
+    assert.ok(form instanceof HTMLFormElement);
+    form.elements.namedItem("columnId").value = "progress";
+
+    await controller.actions.submitTaskWork({ preventDefault() {}, currentTarget: form });
+
+    assert.deepEqual(received, { boardId: "api-board", taskId: "KAN-18", stageId: "progress", targetIndex: 2, version: 3 });
+    assert.ok(controller.getState().columns.find(({ id }) => id === "progress").taskIds.includes("KAN-18"));
+    assert.equal(controller.getState().tasks["KAN-18"].version, 4);
+    controller.destroy();
+  });
+
   test("erlaubt Mitgliedern freie Tasks zu übernehmen und wieder freizugeben", () => {
     const controller = startController();
     controller.actions.switchUser("user-demo-lukas");

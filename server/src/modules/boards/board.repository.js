@@ -4,10 +4,12 @@
  * @property {(boardId: string, userId: string) => Promise<Record<string, any>|null>} findForUser
  * @property {(boardId: string, taskId: string, userId: string) => Promise<Record<string, any>|null>} [findTaskForUser]
  * @property {(boardId: string, taskId: string, version: number, changes: {title: string, category: string, priority: string, dueDate: string|null}) => Promise<Record<string, any>|null>} [updateTaskMetadata]
+ * @property {(boardId: string, taskId: string, userId: string, targetStageId: string) => Promise<Record<string, any>|null>} [findTaskMoveContext]
+ * @property {(boardId: string, taskId: string, targetStageId: string, targetIndex: number, version: number) => Promise<Record<string, any>|null>} [moveTask]
  */
 
 /**
- * @param {Pick<import("pg").Pool, "query">} database
+ * @param {Pick<import("pg").Pool, "query"> & Partial<Pick<import("pg").Pool, "connect">>} database
  * @returns {BoardRepository}
  */
 export function createBoardRepository(database) {
@@ -103,6 +105,58 @@ export function createBoardRepository(database) {
         RETURNING id, title, category, priority, due_date::text, assignee_id, version
       `, [boardId, taskId, version, changes.title, changes.category, changes.priority, changes.dueDate]);
       return result.rows[0] ?? null;
+    },
+
+    async findTaskMoveContext(boardId, taskId, userId, targetStageId) {
+      const result = await database.query(`
+        SELECT t.id, t.stage_id, t.assignee_id, t.version, bm.role,
+          target.id AS target_stage_id, target.wip_limit, target.wip_limit_mode,
+          target.require_completed_todos,
+          (NOT source.transitions_restricted OR EXISTS (
+            SELECT 1 FROM stage_transitions st
+            WHERE st.board_id = t.board_id AND st.source_stage_id = t.stage_id AND st.target_stage_id = target.id
+          )) AS transition_allowed,
+          (SELECT count(*)::int FROM tasks positioned WHERE positioned.stage_id = target.id AND positioned.id <> t.id) AS target_count,
+          (SELECT count(*)::int FROM task_todos td WHERE td.task_id = t.id AND NOT td.completed) AS open_todo_count
+        FROM tasks t
+        JOIN board_members bm ON bm.board_id = t.board_id AND bm.user_id = $3
+        JOIN stages source ON source.id = t.stage_id AND source.board_id = t.board_id
+        LEFT JOIN stages target ON target.id = $4 AND target.board_id = t.board_id
+        WHERE t.board_id = $1 AND t.id = $2
+      `, [boardId, taskId, userId, targetStageId]);
+      return result.rows[0] ?? null;
+    },
+
+    async moveTask(boardId, taskId, targetStageId, targetIndex, version) {
+      if (!("connect" in database) || typeof database.connect !== "function") throw new Error("Transactions are unavailable.");
+      const client = await database.connect();
+      try {
+        await client.query("BEGIN");
+        const locked = await client.query(`
+          SELECT stage_id, position, version FROM tasks
+          WHERE board_id = $1 AND id = $2 FOR UPDATE
+        `, [boardId, taskId]);
+        const current = locked.rows[0];
+        if (!current || Number(current.version) !== version) {
+          await client.query("ROLLBACK");
+          return null;
+        }
+        await client.query(`UPDATE tasks SET position = position - 1 WHERE stage_id = $1 AND position > $2`, [current.stage_id, current.position]);
+        await client.query(`UPDATE tasks SET position = position + 1 WHERE stage_id = $1 AND position >= $2`, [targetStageId, targetIndex]);
+        const result = await client.query(`
+          UPDATE tasks SET stage_id = $3, position = $4, version = version + 1, updated_at = now()
+          WHERE board_id = $1 AND id = $2
+          RETURNING id, stage_id, position, version
+        `, [boardId, taskId, targetStageId, targetIndex]);
+        await client.query(`UPDATE boards SET version = version + 1, updated_at = now() WHERE id = $1`, [boardId]);
+        await client.query("COMMIT");
+        return result.rows[0] ?? null;
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      } finally {
+        client.release();
+      }
     },
   };
 }

@@ -234,6 +234,7 @@ Die API verwendet standardmäßig Port `3000`:
 - `GET /api/boards` listet die Boards des mit `DEV_USER_ID` konfigurierten Entwicklungsbenutzers.
 - `GET /api/boards/:id` liefert ein zugängliches Board einschließlich Mitglieder, Spalten, Tasks, Todos und Übergänge.
 - `PATCH /api/boards/:boardId/tasks/:taskId` aktualisiert Titel, Kategorie, Priorität und Fälligkeit eines Tasks. Das Feld `version` schützt vor dem Überschreiben paralleler Änderungen.
+- `PATCH /api/boards/:boardId/tasks/:taskId/position` verschiebt einen Task transaktional in eine andere Stage und prüft Rollen, Übergänge, offene Todos, harte WIP-Limits und die Task-Version.
 
 `DEV_USER_ID` ist eine vorübergehende Entwicklungsidentität und muss der UUID eines importierten Benutzers entsprechen. Sie ersetzt keine spätere Authentifizierung.
 
@@ -243,7 +244,7 @@ Der Browser bleibt standardmäßig Local-first. Die lesende API-Anbindung kann f
 http://127.0.0.1:4173/?data-source=api&api-url=http://127.0.0.1:3000
 ```
 
-Der Client lädt dann die zugänglichen Boards aus PostgreSQL. Änderungen an Titel, Kategorie, Priorität und Fälligkeit eines bestehenden Tasks werden bereits an den Server geschrieben. Andere Änderungen sind in diesem Zwischenstand nur im Arbeitsspeicher sichtbar; ein Neuladen stellt dafür den Datenbankstand wieder her. Ist die API beim Start nicht erreichbar, verwendet der Client weiterhin den lokalen Workspace.
+Der Client lädt dann die zugänglichen Boards aus PostgreSQL. Änderungen an Titel, Kategorie, Priorität, Fälligkeit und Status eines bestehenden Tasks werden bereits an den Server geschrieben. Andere Änderungen sind in diesem Zwischenstand nur im Arbeitsspeicher sichtbar; ein Neuladen stellt dafür den Datenbankstand wieder her. Ist die API beim Start nicht erreichbar, verwendet der Client weiterhin den lokalen Workspace.
 
 ### Bestehenden Workspace prüfen und importieren
 
@@ -270,7 +271,7 @@ Das initiale relationale Schema trennt Benutzer, Präferenzen, Boards, Mitgliede
 
 ## Aktuelle Grenzen
 
-- Der Browser-Client arbeitet standardmäßig weiterhin mit seinem lokalen Workspace. Im optionalen API-Modus werden Task-Metadaten bereits gespeichert; alle anderen Änderungen gehen beim Neuladen weiterhin verloren.
+- Der Browser-Client arbeitet standardmäßig weiterhin mit seinem lokalen Workspace. Im optionalen API-Modus werden Task-Metadaten und Statusänderungen aus dem Task-Dialog bereits gespeichert; alle anderen Änderungen gehen beim Neuladen weiterhin verloren.
 - Es gibt noch keine Anmeldung; die lesende API begrenzt den Zugriff vorläufig über `DEV_USER_ID`.
 - Gleichzeitige Bearbeitung durch mehrere Personen wird nicht unterstützt.
 - Automatische oder zeitgesteuerte Backups sind nicht vorhanden; Exporte müssen manuell ausgelöst werden.

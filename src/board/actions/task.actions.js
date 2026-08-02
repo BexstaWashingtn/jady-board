@@ -130,7 +130,7 @@ export function createTaskActions(context) {
     },
 
     /** @param {Event} event */
-    submitTaskWork(event) {
+    async submitTaskWork(event) {
       event.preventDefault();
       if (!(event.currentTarget instanceof HTMLFormElement)) return;
       const data = new FormData(event.currentTarget);
@@ -149,8 +149,22 @@ export function createTaskActions(context) {
       }
       if (sourceColumn?.id !== targetColumnId) {
         const undo = createMoveUndo(state, taskId);
+        const previousColumns = structuredClone(state.columns);
+        const previousVersion = state.tasks[taskId].version;
         moveTask(state, taskId, targetColumnId);
-        context.registerUndo(undo, `${taskId} nach „${context.columnTitle(targetColumnId)}“ verschoben.`);
+        if (context.moveTaskRemote) {
+          try {
+            const targetIndex = state.columns.find(({ id }) => id === targetColumnId)?.taskIds.indexOf(taskId) ?? 0;
+            const saved = await context.moveTaskRemote(context.workspace.activeBoardId, state.tasks[taskId], targetColumnId, targetIndex);
+            state.tasks[taskId].version = saved.version;
+          } catch (error) {
+            state.columns = previousColumns;
+            state.tasks[taskId].version = previousVersion;
+            throw error;
+          }
+        }
+        if (context.moveTaskRemote) context.registerNotice(`${taskId} wurde nach „${context.columnTitle(targetColumnId)}“ verschoben.`);
+        else context.registerUndo(undo, `${taskId} nach „${context.columnTitle(targetColumnId)}“ verschoben.`);
       }
       context.saveState();
       context.render();

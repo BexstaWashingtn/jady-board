@@ -87,6 +87,34 @@ describe("Board-Service", () => {
     repository.findTaskForUser = async () => ({ id: TASK_ID, assignee_id: USER_ID, version: 4, role: "member" });
     assert.equal((await service.updateTask(BOARD_ID, TASK_ID, USER_ID, valid)).status, "conflict");
   });
+  test("verschiebt Tasks nach zentraler Prüfung der Workflow-Regeln", async () => {
+    let received;
+    const service = createBoardService({
+      async listForUser() { return []; }, async findForUser() { return null; },
+      async findTaskMoveContext() {
+        return { id: TASK_ID, stage_id: STAGE_ID, assignee_id: USER_ID, version: 4, role: "member", target_stage_id: TARGET_STAGE_ID, transition_allowed: true, require_completed_todos: true, open_todo_count: 0, wip_limit: 2, wip_limit_mode: "strict", target_count: 1 };
+      },
+      async moveTask(...args) { received = args; return { id: TASK_ID, stage_id: TARGET_STAGE_ID, position: 1, version: 5 }; },
+    });
+    const result = await service.moveTask(BOARD_ID, TASK_ID, USER_ID, { stageId: TARGET_STAGE_ID, version: 4 });
+    assert.deepEqual(received, [BOARD_ID, TASK_ID, TARGET_STAGE_ID, 1, 4]);
+    assert.deepEqual(result, { status: "moved", task: { id: TASK_ID, stageId: TARGET_STAGE_ID, position: 1, version: 5 } });
+  });
+
+  test("blockiert unerlaubte Übergänge, offene Todos und harte WIP-Limits", async () => {
+    const context = { id: TASK_ID, stage_id: STAGE_ID, assignee_id: USER_ID, version: 4, role: "member", target_stage_id: TARGET_STAGE_ID, transition_allowed: false, require_completed_todos: false, open_todo_count: 0, wip_limit: null, wip_limit_mode: "warning", target_count: 0 };
+    const repository = {
+      async listForUser() { return []; }, async findForUser() { return null; },
+      async findTaskMoveContext() { return context; }, async moveTask() { throw new Error("must not move"); },
+    };
+    const service = createBoardService(repository);
+    const input = { stageId: TARGET_STAGE_ID, version: 4 };
+    assert.equal((await service.moveTask(BOARD_ID, TASK_ID, USER_ID, input)).status, "rejected");
+    context.transition_allowed = true; context.require_completed_todos = true; context.open_todo_count = 1;
+    assert.equal((await service.moveTask(BOARD_ID, TASK_ID, USER_ID, input)).status, "rejected");
+    context.require_completed_todos = false; context.open_todo_count = 0; context.wip_limit = 1; context.wip_limit_mode = "strict"; context.target_count = 1;
+    assert.equal((await service.moveTask(BOARD_ID, TASK_ID, USER_ID, input)).status, "rejected");
+  });
 });
 
 const USER_ID = "8acf3017-cf6e-589b-bd47-a1d8ccec16a8";
