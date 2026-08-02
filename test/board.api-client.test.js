@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 
-import { loadApiWorkspace, readApiDataSource } from "../src/board/board.api-client.js";
+import { loadApiWorkspace, readApiDataSource, updateApiTask } from "../src/board/board.api-client.js";
 
 describe("Board-API-Client", () => {
   test("aktiviert die API ausschließlich per URL-Opt-in", () => {
@@ -29,6 +29,29 @@ describe("Board-API-Client", () => {
   test("fällt bei fehlenden Boards und HTTP-Fehlern kontrolliert aus", async () => {
     await assert.rejects(loadApiWorkspace("http://api", async () => response({ boards: [] })), /no accessible boards/);
     await assert.rejects(loadApiWorkspace("http://api", async () => response({}, 503)), /503/);
+  });
+
+  test("speichert Task-Metadaten mit der aktuellen Server-Version", async () => {
+    let received;
+    const task = boardResponse().tasks["task-id"];
+    const updated = await updateApiTask("http://api", "board/id", task, async (url, options) => {
+      received = { url, options };
+      return response({ task: { id: "task-id", title: "API Task", version: 2 } });
+    });
+    assert.equal(received.url, "http://api/api/boards/board%2Fid/tasks/task-id");
+    assert.equal(received.options.method, "PATCH");
+    assert.deepEqual(JSON.parse(received.options.body), {
+      title: "API Task", category: "Test", priority: "medium", dueDate: null, version: 1,
+    });
+    assert.equal(updated.version, 2);
+  });
+
+  test("übersetzt Versionskonflikte in eine verständliche Meldung", async () => {
+    const task = boardResponse().tasks["task-id"];
+    await assert.rejects(
+      updateApiTask("http://api", "board-id", task, async () => response({ error: { code: "TASK_VERSION_CONFLICT" } }, 409)),
+      /zwischenzeitlich geändert/,
+    );
   });
 });
 

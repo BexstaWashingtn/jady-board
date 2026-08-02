@@ -1,5 +1,5 @@
 /** @typedef {{ id: string, text: string, completed: boolean }} TaskTodo */
-/** @typedef {{ id: string, title: string, category: string, priority: "low" | "medium" | "high", comments: number, todos: TaskTodo[], dueDate: string | null, assigneeId: string | null }} BoardTask */
+/** @typedef {{ id: string, title: string, category: string, priority: "low" | "medium" | "high", comments: number, todos: TaskTodo[], dueDate: string | null, assigneeId: string | null, version?: number }} BoardTask */
 /** @typedef {"backlog" | "active" | "review" | "done"} ColumnKind */
 /** @typedef {"warning" | "strict"} LimitMode */
 /** @typedef {{ id: string, title: string, color: string, kind: ColumnKind, limit: number | null, limitMode: LimitMode, allowedTargetIds: string[] | null, requireCompletedTodos: boolean, taskIds: string[] }} BoardColumn */

@@ -28,6 +28,7 @@
  * @property {(taskId: string, targetColumnId: string) => string} moveRejectionMessage
  * @property {(taskId: string, targetColumnId: string) => string} moveRejectionLabel
  * @property {(workspace: import("../board.persistence.js").BoardWorkspace) => void} replaceWorkspace
+ * @property {((boardId: string, task: import("../board.state.js").BoardTask) => Promise<Partial<import("../board.state.js").BoardTask>>)|undefined} updateTaskRemote
  */
 
 export {};

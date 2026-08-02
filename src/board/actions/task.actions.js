@@ -106,14 +106,24 @@ export function createTaskActions(context) {
     },
 
     /** @param {Event} event */
-    submitTaskDetails(event) {
+    async submitTaskDetails(event) {
       event.preventDefault();
       if (!(event.currentTarget instanceof HTMLFormElement)) return;
       const data = new FormData(event.currentTarget);
       const state = context.state();
       const taskId = String(data.get("taskId") ?? "");
       if (!canEditTask(state, taskId, context.workspace.activeUserId)) return;
+      const previous = structuredClone(state.tasks[taskId]);
       updateTask(state, taskId, { title: data.get("title"), category: data.get("category"), priority: data.get("priority"), dueDate: data.get("dueDate") });
+      if (context.updateTaskRemote) {
+        try {
+          const saved = await context.updateTaskRemote(context.workspace.activeBoardId, state.tasks[taskId]);
+          Object.assign(state.tasks[taskId], saved);
+        } catch (error) {
+          state.tasks[taskId] = previous;
+          throw error;
+        }
+      }
       context.viewState().taskEditOpen = false;
       context.saveState();
       context.render();

@@ -429,6 +429,60 @@ describe("Board-Controller-Integration", () => {
     assert.equal(controller.getState().tasks["KAN-18"].priority, "high");
   });
 
+  test("persistiert Task-Metadaten im API-Modus und übernimmt die neue Version", async () => {
+    const state = createInitialBoardState();
+    state.tasks["KAN-18"].version = 3;
+    let received;
+    const workspace = {
+      activeBoardId: "api-board", boards: { "api-board": state }, activeUserId: "user-1",
+      users: { "user-1": { id: "user-1", name: "API User", initials: "AU", preferences: { theme: /** @type {const} */ ("system") } } },
+    };
+    const controller = createBoardController(createApp("#root"), {
+      workspace, persist: () => true, seedShowcase: false,
+      async updateTaskRemote(boardId, task) {
+        received = { boardId, title: task.title, version: task.version };
+        return { version: 4 };
+      },
+    });
+    taskCard("KAN-18").click();
+    findButton("Bearbeiten").click();
+    const form = document.querySelector(".task-edit-form");
+    assert.ok(form instanceof HTMLFormElement);
+    form.elements.namedItem("title").value = "Auf dem Server gespeichert";
+
+    await controller.actions.submitTaskDetails({ preventDefault() {}, currentTarget: form });
+
+    assert.deepEqual(received, { boardId: "api-board", title: "Auf dem Server gespeichert", version: 3 });
+    assert.equal(controller.getState().tasks["KAN-18"].version, 4);
+    assert.equal(document.querySelector(".task-edit-form"), null);
+  });
+
+  test("rollt Task-Metadaten bei einem API-Konflikt zurück", async () => {
+    const state = createInitialBoardState();
+    state.tasks["KAN-18"].version = 3;
+    const originalTitle = state.tasks["KAN-18"].title;
+    const workspace = {
+      activeBoardId: "api-board", boards: { "api-board": state }, activeUserId: "user-1",
+      users: { "user-1": { id: "user-1", name: "API User", initials: "AU", preferences: { theme: /** @type {const} */ ("system") } } },
+    };
+    const controller = createBoardController(createApp("#root"), {
+      workspace, persist: () => true, seedShowcase: false,
+      async updateTaskRemote() { throw new Error("Der Task wurde zwischenzeitlich geändert."); },
+    });
+    taskCard("KAN-18").click();
+    findButton("Bearbeiten").click();
+    const form = document.querySelector(".task-edit-form");
+    assert.ok(form instanceof HTMLFormElement);
+    form.elements.namedItem("title").value = "Nicht gespeichert";
+
+    await controller.actions.submitTaskDetails({ preventDefault() {}, currentTarget: form });
+
+    assert.equal(controller.getState().tasks["KAN-18"].title, originalTitle);
+    assert.ok(document.querySelector(".task-edit-form"));
+    assert.match(document.body.textContent, /zwischenzeitlich geändert/);
+    controller.destroy();
+  });
+
   test("erlaubt Mitgliedern freie Tasks zu übernehmen und wieder freizugeben", () => {
     const controller = startController();
     controller.actions.switchUser("user-demo-lukas");

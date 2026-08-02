@@ -42,6 +42,34 @@ export async function loadApiWorkspace(baseUrl, request = fetch) {
   return { activeBoardId: String(first.id), boards, activeUserId, users };
 }
 
+/**
+ * Persists editable task metadata using the version received with the board.
+ *
+ * @param {string} baseUrl
+ * @param {string} boardId
+ * @param {import("./board.state.js").BoardTask} task
+ * @param {typeof fetch} [request]
+ * @returns {Promise<Partial<import("./board.state.js").BoardTask>>}
+ */
+export async function updateApiTask(baseUrl, boardId, task, request = fetch) {
+  if (!Number.isInteger(task.version) || Number(task.version) < 1) throw new Error("Der Task besitzt keine gültige Server-Version.");
+  const response = await request(`${baseUrl}/api/boards/${encodeURIComponent(boardId)}/tasks/${encodeURIComponent(task.id)}`, {
+    method: "PATCH",
+    headers: { Accept: "application/json", "Content-Type": "application/json" },
+    body: JSON.stringify({
+      title: task.title, category: task.category, priority: task.priority,
+      dueDate: task.dueDate, version: task.version,
+    }),
+  });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    if (response.status === 409) throw new Error("Der Task wurde zwischenzeitlich geändert. Bitte lade das Board neu.");
+    throw new Error(String(body?.error?.message ?? `Task konnte nicht gespeichert werden (${response.status}).`));
+  }
+  if (!body.task || Number(body.task.version) < 1) throw new Error("Die Board-API hat einen ungültigen Task zurückgegeben.");
+  return body.task;
+}
+
 /** @param {typeof fetch} request @param {string} url @returns {Promise<Record<string, any>>} */
 async function getJson(request, url) {
   const response = await request(url, { headers: { Accept: "application/json" } });
