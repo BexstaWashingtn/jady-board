@@ -188,26 +188,29 @@ export function createTaskActions(context) {
     },
 
     /** @param {string} taskId */
-    claimTask(taskId) {
+    async claimTask(taskId) {
       const state = context.state();
       const userId = context.workspace.activeUserId;
       if (!canClaimTask(state, taskId, userId)) return;
       updateTask(state, taskId, { assigneeId: userId });
+      if (context.assignTaskRemote) await persistRemoteAssignment(context, state, taskId, null);
       context.saveState();
       context.render();
     },
 
     /** @param {string} taskId */
-    releaseTask(taskId) {
+    async releaseTask(taskId) {
       const state = context.state();
       if (!canReleaseTask(state, taskId, context.workspace.activeUserId)) return;
+      const previous = state.tasks[taskId].assigneeId;
       updateTask(state, taskId, { assigneeId: null });
+      if (context.assignTaskRemote) await persistRemoteAssignment(context, state, taskId, previous);
       context.saveState();
       context.render();
     },
 
     /** @param {Event} event */
-    assignTask(event) {
+    async assignTask(event) {
       event.preventDefault();
       if (!(event.currentTarget instanceof HTMLFormElement)) return;
       const data = new FormData(event.currentTarget);
@@ -215,7 +218,9 @@ export function createTaskActions(context) {
       const taskId = String(data.get("taskId") ?? "");
       if (!canAssignTask(state, taskId, context.workspace.activeUserId)) return;
       const assigneeId = String(data.get("assigneeId") ?? "");
+      const previous = state.tasks[taskId].assigneeId;
       updateTask(state, taskId, { assigneeId: state.project.memberIds.includes(assigneeId) ? assigneeId : null });
+      if (context.assignTaskRemote) await persistRemoteAssignment(context, state, taskId, previous);
       context.saveState();
       context.render();
     },
@@ -232,4 +237,16 @@ export function createTaskActions(context) {
       context.render();
     },
   };
+}
+
+/** @param {import("./action-context.js").BoardActionContext} context @param {import("../board.state.js").BoardState} state @param {string} taskId @param {string|null} previous */
+async function persistRemoteAssignment(context, state, taskId, previous) {
+  if (!context.assignTaskRemote) return;
+  try {
+    const saved = await context.assignTaskRemote(context.workspace.activeBoardId, state.tasks[taskId]);
+    Object.assign(state.tasks[taskId], saved);
+  } catch (error) {
+    state.tasks[taskId].assigneeId = previous;
+    throw error;
+  }
 }

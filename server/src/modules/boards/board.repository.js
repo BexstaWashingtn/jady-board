@@ -7,6 +7,8 @@
  * @property {(boardId: string, taskId: string, userId: string, targetStageId: string) => Promise<Record<string, any>|null>} [findTaskMoveContext]
  * @property {(boardId: string, taskId: string, targetStageId: string, targetIndex: number, version: number) => Promise<Record<string, any>|null>} [moveTask]
  * @property {(boardId: string, userId: string, input: {id: string, stageId: string, title: string, category: string, priority: string, assigneeId: string|null, dueDate: string|null}) => Promise<{status: "created", task: Record<string, any>}|{status: "not_found"|"forbidden"|"wip_limit"}>} [createTask]
+ * @property {(boardId: string, userId: string) => Promise<boolean>} [isBoardMember]
+ * @property {(boardId: string, taskId: string, version: number, assigneeId: string|null) => Promise<Record<string, any>|null>} [updateTaskAssignment]
  */
 
 /**
@@ -202,6 +204,20 @@ export function createBoardRepository(database) {
       } finally {
         client.release();
       }
+    },
+
+    async isBoardMember(boardId, userId) {
+      const result = await database.query(`SELECT 1 FROM board_members WHERE board_id = $1 AND user_id = $2`, [boardId, userId]);
+      return Boolean(result.rowCount);
+    },
+
+    async updateTaskAssignment(boardId, taskId, version, assigneeId) {
+      const result = await database.query(`
+        UPDATE tasks SET assignee_id = $4, version = version + 1, updated_at = now()
+        WHERE board_id = $1 AND id = $2 AND version = $3
+        RETURNING id, assignee_id, version
+      `, [boardId, taskId, version, assigneeId]);
+      return result.rows[0] ?? null;
     },
   };
 }

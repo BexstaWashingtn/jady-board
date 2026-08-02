@@ -125,6 +125,26 @@ export async function createApiTask(baseUrl, boardId, task, stageId, request = f
   return body.task;
 }
 
+/**
+ * @param {string} baseUrl @param {string} boardId @param {import("./board.state.js").BoardTask} task
+ * @param {typeof fetch} [request]
+ * @returns {Promise<{assigneeId: string|null, version: number}>}
+ */
+export async function assignApiTask(baseUrl, boardId, task, request = fetch) {
+  if (!Number.isInteger(task.version) || Number(task.version) < 1) throw new Error("Der Task besitzt keine gültige Server-Version.");
+  const response = await request(`${baseUrl}/api/boards/${encodeURIComponent(boardId)}/tasks/${encodeURIComponent(task.id)}/assignment`, {
+    method: "PATCH", headers: { Accept: "application/json", "Content-Type": "application/json" },
+    body: JSON.stringify({ assigneeId: task.assigneeId, version: task.version }),
+  });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    if (response.status === 409) throw new Error("Der Task wurde zwischenzeitlich geändert. Bitte lade das Board neu.");
+    if (response.status === 403) throw new Error("Diese Task-Zuweisung ist nicht erlaubt.");
+    throw new Error(String(body?.error?.message ?? `Zuweisung konnte nicht gespeichert werden (${response.status}).`));
+  }
+  return body.task;
+}
+
 /** @param {typeof fetch} request @param {string} url @returns {Promise<Record<string, any>>} */
 async function getJson(request, url) {
   const response = await request(url, { headers: { Accept: "application/json" } });

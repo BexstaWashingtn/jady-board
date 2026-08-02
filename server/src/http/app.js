@@ -132,6 +132,25 @@ export function createApiHandler({ database, boardService, currentUserId = null 
       return;
     }
 
+    const assignmentMatch = method === "PATCH" ? url.pathname.match(/^\/api\/boards\/([^/]+)\/tasks\/([^/]+)\/assignment$/) : null;
+    if (assignmentMatch) {
+      if (!boardService || !currentUserId) { sendJson(response, 503, identityUnavailable()); return; }
+      const boardId = decodeURIComponent(assignmentMatch[1]);
+      const taskId = decodeURIComponent(assignmentMatch[2]);
+      if (!isUuid(boardId) || !isUuid(taskId)) { sendJson(response, 400, { error: { code: "INVALID_RESOURCE_ID", message: "Board and task IDs must be UUIDs." } }); return; }
+      let body;
+      try { body = await readJson(request); } catch { sendJson(response, 400, { error: { code: "INVALID_JSON", message: "A valid JSON request body is required." } }); return; }
+      try {
+        const result = await boardService.assignTask(boardId, taskId, currentUserId, body);
+        if (result.status === "updated") sendJson(response, 200, { task: result.task });
+        else if (result.status === "invalid") sendJson(response, 400, { error: { code: "INVALID_ASSIGNMENT", message: result.message } });
+        else if (result.status === "forbidden") sendJson(response, 403, { error: { code: "TASK_ASSIGNMENT_FORBIDDEN", message: "Task assignment is not permitted." } });
+        else if (result.status === "conflict") sendJson(response, 409, { error: { code: "TASK_VERSION_CONFLICT", message: "Task has been changed by another request." } });
+        else sendJson(response, 404, { error: { code: "TASK_NOT_FOUND", message: "Task not found." } });
+      } catch { sendJson(response, 500, internalError()); }
+      return;
+    }
+
     const taskMatch = method === "PATCH" ? url.pathname.match(/^\/api\/boards\/([^/]+)\/tasks\/([^/]+)$/) : null;
     if (taskMatch) {
       if (!boardService || !currentUserId) {

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 
-import { createApiTask, loadApiWorkspace, moveApiTask, readApiDataSource, updateApiTask } from "../src/board/board.api-client.js";
+import { assignApiTask, createApiTask, loadApiWorkspace, moveApiTask, readApiDataSource, updateApiTask } from "../src/board/board.api-client.js";
 
 describe("Board-API-Client", () => {
   test("aktiviert die API ausschließlich per URL-Opt-in", () => {
@@ -74,6 +74,17 @@ describe("Board-API-Client", () => {
     });
     assert.deepEqual(requestBody, { stageId: "stage-id", title: "API Task", category: "Test", priority: "medium", assigneeId: "user-id", dueDate: null });
     assert.equal(created.id, "server-task-id");
+  });
+
+  test("persistiert Task-Zuweisungen versioniert", async () => {
+    const task = { ...boardResponse().tasks["task-id"], assigneeId: null };
+    let requestBody;
+    const assigned = await assignApiTask("http://api", "board-id", task, async (_url, options) => {
+      requestBody = JSON.parse(options.body);
+      return response({ task: { assigneeId: null, version: 2 } });
+    });
+    assert.deepEqual(requestBody, { assigneeId: null, version: 1 });
+    assert.equal(assigned.version, 2);
   });
 });
 

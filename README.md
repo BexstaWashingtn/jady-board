@@ -236,6 +236,7 @@ Die API verwendet standardmäßig Port `3000`:
 - `PATCH /api/boards/:boardId/tasks/:taskId` aktualisiert Titel, Kategorie, Priorität und Fälligkeit eines Tasks. Das Feld `version` schützt vor dem Überschreiben paralleler Änderungen.
 - `PATCH /api/boards/:boardId/tasks/:taskId/position` verschiebt einen Task transaktional in eine andere Stage und prüft Rollen, Übergänge, offene Todos, harte WIP-Limits und die Task-Version.
 - `POST /api/boards/:boardId/tasks` erstellt einen Task mit atomar vergebener Tasknummer und prüft Mitgliedschaft, Zuweisung und harte WIP-Limits.
+- `PATCH /api/boards/:boardId/tasks/:taskId/assignment` weist einen Task versioniert zu oder gibt ihn frei und setzt die Owner-/Bearbeiterregeln serverseitig durch.
 
 `DEV_USER_ID` ist eine vorübergehende Entwicklungsidentität und muss der UUID eines importierten Benutzers entsprechen. Sie ersetzt keine spätere Authentifizierung.
 
@@ -245,7 +246,7 @@ Der Browser bleibt standardmäßig Local-first. Die lesende API-Anbindung kann f
 http://127.0.0.1:4173/?data-source=api&api-url=http://127.0.0.1:3000
 ```
 
-Der Client lädt dann die zugänglichen Boards aus PostgreSQL. Neue Tasks sowie Änderungen an Titel, Kategorie, Priorität, Fälligkeit und Status bestehender Tasks werden bereits an den Server geschrieben. Andere Änderungen sind in diesem Zwischenstand nur im Arbeitsspeicher sichtbar; ein Neuladen stellt dafür den Datenbankstand wieder her. Ist die API beim Start nicht erreichbar, verwendet der Client weiterhin den lokalen Workspace.
+Der Client lädt dann die zugänglichen Boards aus PostgreSQL. Neue Tasks sowie Änderungen an Titel, Kategorie, Priorität, Fälligkeit, Status und Zuweisung bestehender Tasks werden bereits an den Server geschrieben. Andere Änderungen sind in diesem Zwischenstand nur im Arbeitsspeicher sichtbar; ein Neuladen stellt dafür den Datenbankstand wieder her. Ist die API beim Start nicht erreichbar, verwendet der Client weiterhin den lokalen Workspace.
 
 ### Bestehenden Workspace prüfen und importieren
 

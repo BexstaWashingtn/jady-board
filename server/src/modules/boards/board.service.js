@@ -7,6 +7,7 @@ import { randomUUID } from "node:crypto";
  * @property {(boardId: string, taskId: string, userId: string, input: unknown) => Promise<{status: "updated", task: Record<string, any>}|{status: "not_found"|"forbidden"|"conflict"}|{status: "invalid", message: string}>} updateTask
  * @property {(boardId: string, taskId: string, userId: string, input: unknown) => Promise<{status: "moved", task: Record<string, any>}|{status: "not_found"|"forbidden"|"conflict"}|{status: "rejected", code: string, message: string}|{status: "invalid", message: string}>} moveTask
  * @property {(boardId: string, userId: string, input: unknown) => Promise<{status: "created", task: Record<string, any>}|{status: "not_found"|"forbidden"}|{status: "rejected", code: string, message: string}|{status: "invalid", message: string}>} createTask
+ * @property {(boardId: string, taskId: string, userId: string, input: unknown) => Promise<{status: "updated", task: Record<string, any>}|{status: "not_found"|"forbidden"|"conflict"}|{status: "invalid", message: string}>} assignTask
  */
 
 /**
@@ -88,7 +89,38 @@ export function createBoardService(repository) {
         stageId: String(row.stage_id), position: Number(row.position),
       } };
     },
+
+    async assignTask(boardId, taskId, userId, input) {
+      const parsed = parseTaskAssignment(input);
+      if ("message" in parsed) return { status: "invalid", message: parsed.message };
+      if (!repository.findTaskForUser || !repository.isBoardMember || !repository.updateTaskAssignment) throw new Error("Task assignment is unavailable.");
+      const current = await repository.findTaskForUser(boardId, taskId, userId);
+      if (!current) return { status: "not_found" };
+      if (Number(current.version) !== parsed.version) return { status: "conflict" };
+      const currentAssignee = current.assignee_id ? String(current.assignee_id) : null;
+      if (parsed.assigneeId && !(await repository.isBoardMember(boardId, parsed.assigneeId))) return { status: "forbidden" };
+      const allowed = current.role === "owner"
+        || (currentAssignee === null && parsed.assigneeId === userId)
+        || (currentAssignee === userId && parsed.assigneeId === null);
+      if (!allowed) return { status: "forbidden" };
+      if (currentAssignee === parsed.assigneeId) return { status: "updated", task: { id: taskId, assigneeId: currentAssignee, version: parsed.version } };
+      const updated = await repository.updateTaskAssignment(boardId, taskId, parsed.version, parsed.assigneeId);
+      if (!updated) return { status: "conflict" };
+      return { status: "updated", task: { id: String(updated.id), assigneeId: updated.assignee_id ? String(updated.assignee_id) : null, version: Number(updated.version) } };
+    },
   };
+}
+
+/**
+ * @param {unknown} input
+ * @returns {{message: string}|{assigneeId: string|null, version: number}}
+ */
+function parseTaskAssignment(input) {
+  if (!input || typeof input !== "object" || Array.isArray(input)) return { message: "A JSON object is required." };
+  const value = /** @type {Record<string, unknown>} */ (input);
+  if (value.assigneeId !== null && typeof value.assigneeId !== "string") return { message: "Task assignee is invalid." };
+  if (!Number.isInteger(value.version) || Number(value.version) < 1) return { message: "Task version must be a positive integer." };
+  return { assigneeId: value.assigneeId === null || value.assigneeId === "" ? null : String(value.assigneeId), version: Number(value.version) };
 }
 
 /**

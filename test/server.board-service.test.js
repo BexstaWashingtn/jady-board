@@ -139,6 +139,28 @@ describe("Board-Service", () => {
     const result = await service.createTask(BOARD_ID, USER_ID, { stageId: STAGE_ID, title: "Neu", category: "Core", priority: "medium" });
     assert.deepEqual(result, { status: "rejected", code: "WIP_LIMIT_REACHED", message: "The target stage has reached its WIP limit." });
   });
+
+  test("erlaubt Selbstübernahme und versionierte Zuweisung", async () => {
+    let received;
+    const service = createBoardService({
+      async listForUser() { return []; }, async findForUser() { return null; },
+      async findTaskForUser() { return { id: TASK_ID, assignee_id: null, version: 2, role: "member" }; },
+      async isBoardMember() { return true; },
+      async updateTaskAssignment(...args) { received = args; return { id: TASK_ID, assignee_id: USER_ID, version: 3 }; },
+    });
+    const result = await service.assignTask(BOARD_ID, TASK_ID, USER_ID, { assigneeId: USER_ID, version: 2 });
+    assert.deepEqual(received, [BOARD_ID, TASK_ID, 2, USER_ID]);
+    assert.deepEqual(result, { status: "updated", task: { id: TASK_ID, assigneeId: USER_ID, version: 3 } });
+  });
+
+  test("verbietet Mitgliedern die Zuweisung an andere Personen", async () => {
+    const service = createBoardService({
+      async listForUser() { return []; }, async findForUser() { return null; },
+      async findTaskForUser() { return { id: TASK_ID, assignee_id: null, version: 2, role: "member" }; },
+      async isBoardMember() { return true; }, async updateTaskAssignment() { throw new Error("must not update"); },
+    });
+    assert.equal((await service.assignTask(BOARD_ID, TASK_ID, USER_ID, { assigneeId: TARGET_STAGE_ID, version: 2 })).status, "forbidden");
+  });
 });
 
 const USER_ID = "8acf3017-cf6e-589b-bd47-a1d8ccec16a8";

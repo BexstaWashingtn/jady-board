@@ -31,6 +31,7 @@
  * @property {((boardId: string, task: import("../board.state.js").BoardTask) => Promise<Partial<import("../board.state.js").BoardTask>>)|undefined} updateTaskRemote
  * @property {((boardId: string, task: import("../board.state.js").BoardTask, stageId: string, targetIndex: number) => Promise<{version: number}>)|undefined} moveTaskRemote
  * @property {((boardId: string, task: import("../board.state.js").BoardTask, stageId: string) => Promise<import("../board.state.js").BoardTask>)|undefined} createTaskRemote
+ * @property {((boardId: string, task: import("../board.state.js").BoardTask) => Promise<{assigneeId: string|null, version: number}>)|undefined} assignTaskRemote
  */
 
 export {};

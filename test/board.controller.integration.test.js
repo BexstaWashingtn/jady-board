@@ -537,6 +537,23 @@ describe("Board-Controller-Integration", () => {
     assert.ok(controller.getState().columns[0].taskIds.includes("912e8124-aa18-5848-bac7-3486be614b78"));
   });
 
+  test("persistiert die Selbstübernahme eines Tasks im API-Modus", async () => {
+    const state = createInitialBoardState();
+    state.tasks["KAN-18"].version = 2;
+    let received;
+    const workspace = {
+      activeBoardId: "api-board", boards: { "api-board": state }, activeUserId: "user-1",
+      users: { "user-1": { id: "user-1", name: "API User", initials: "AU", preferences: { theme: /** @type {const} */ ("system") } } },
+    };
+    const controller = createBoardController(createApp("#root"), {
+      workspace, persist: () => true, seedShowcase: false,
+      async assignTaskRemote(_boardId, task) { received = { assigneeId: task.assigneeId, version: task.version }; return { assigneeId: "user-1", version: 3 }; },
+    });
+    await controller.actions.claimTask("KAN-18");
+    assert.deepEqual(received, { assigneeId: "user-1", version: 2 });
+    assert.equal(controller.getState().tasks["KAN-18"].version, 3);
+  });
+
   test("erlaubt Mitgliedern freie Tasks zu übernehmen und wieder freizugeben", () => {
     const controller = startController();
     controller.actions.switchUser("user-demo-lukas");
