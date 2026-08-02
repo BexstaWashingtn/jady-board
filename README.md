@@ -269,7 +269,7 @@ Das initiale relationale Schema trennt Benutzer, Präferenzen, Boards, Mitgliede
 
 ## Aktuelle Grenzen
 
-- Der Browser-Client liest und schreibt weiterhin seinen lokalen Workspace; die neue Board-API ist noch nicht angebunden.
+- Der Browser-Client arbeitet standardmäßig weiterhin mit seinem lokalen Workspace. Die Board-API kann optional als lesende Datenquelle aktiviert werden; Änderungen im API-Modus werden noch nicht an den Server geschrieben und gehen beim Neuladen verloren.
 - Es gibt noch keine Anmeldung; die lesende API begrenzt den Zugriff vorläufig über `DEV_USER_ID`.
 - Gleichzeitige Bearbeitung durch mehrere Personen wird nicht unterstützt.
 - Automatische oder zeitgesteuerte Backups sind nicht vorhanden; Exporte müssen manuell ausgelöst werden.
