@@ -7,6 +7,7 @@
     "dev:server": "node --watch server/src/server.js",
     "start:server": "node server/src/server.js",
     "db:migrate": "node server/src/db/migrate.js",
+    "db:import": "node server/src/db/import-workspace.js",
     "test": "node --test",
     "test:e2e": "playwright test",
     "test:e2e:headed": "playwright test --headed",

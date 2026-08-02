@@ -232,6 +232,27 @@ Die API verwendet standardmäßig Port `3000`:
 - `GET /api/health` prüft, ob der Node.js-Prozess antwortet.
 - `GET /api/ready` prüft zusätzlich die PostgreSQL-Verbindung.
 
+### Bestehenden Workspace prüfen und importieren
+
+Ein vom Local-first-Client exportiertes JaDy-Board-Backup kann zunächst ohne
+Datenbankzugriff validiert werden:
+
+```bash
+npm run db:import -- --dry-run ./jady-board-backup.json
+```
+
+Der echte Import benötigt `DATABASE_URL` und ein vollständig migriertes Schema:
+
+```bash
+npm run db:migrate
+npm run db:import -- ./jady-board-backup.json
+```
+
+Der Import bildet Legacy-IDs deterministisch auf UUIDs ab und übernimmt
+Benutzer, Einstellungen, Boards, Mitglieder, Stages, Übergänge, Tasks und Todos
+in einer gemeinsamen Transaktion. Ein inhaltlich identisches Backup wird nur
+einmal akzeptiert.
+
 Das initiale relationale Schema trennt Benutzer, Präferenzen, Boards, Mitglieder, Stages, Stage-Übergänge, Tasks und Todos. Positions- und Versionsfelder bereiten sortierbare Inhalte und optimistische Nebenläufigkeitskontrolle vor.
 
 ## Aktuelle Grenzen
