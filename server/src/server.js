@@ -4,6 +4,7 @@ import { pathToFileURL } from "node:url";
 import { loadConfig } from "./config.js";
 import { createDatabase } from "./db/database.js";
 import { createApiHandler } from "./http/app.js";
+import { createDevelopmentIdentityResolver } from "./http/request-identity.js";
 import { createBoardRepository } from "./modules/boards/board.repository.js";
 import { createBoardService } from "./modules/boards/board.service.js";
 
@@ -14,7 +15,11 @@ export function createJaDyServer(config) {
   const database = createDatabase(config);
   const boardRepository = createBoardRepository(database);
   const boardService = createBoardService(boardRepository);
-  const server = createServer(createApiHandler({ database, boardService, currentUserId: config.devUserId }));
+  const server = createServer(createApiHandler({
+    database,
+    boardService,
+    resolveIdentity: createDevelopmentIdentityResolver(config.devUserId),
+  }));
 
   async function close() {
     if (server.listening) {

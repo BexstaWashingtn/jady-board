@@ -2,9 +2,14 @@
 
 **Live-Version:** [https://jady-board.vercel.app](https://jady-board.vercel.app)
 
-JaDy Board ist eine browserbasierte Kanban-Anwendung zur Organisation von Aufgaben, Arbeitsabläufen und kleinen Teams. Die Oberfläche wurde vollständig mit dem eigenen **JaDyDoCo-Framework** (JavaScript Dynamic DOM Constructor) umgesetzt und kommt ohne Frontend-Framework und ohne produktive Laufzeitabhängigkeiten aus.
+JaDy Board ist eine browserbasierte Kanban-Anwendung zur Organisation von Aufgaben, Arbeitsabläufen und kleinen Teams. Die Oberfläche wurde vollständig mit dem eigenen **JaDyDoCo-Framework** (JavaScript Dynamic DOM Constructor) umgesetzt und kommt ohne Frontend-Framework und ohne produktive Frontend-Laufzeitabhängigkeiten aus.
 
-Das Projekt läuft vollständig im Browser. Boards, Aufgaben, Benutzerprofile und Einstellungen werden lokal im `localStorage` gespeichert.
+Das Repository unterstützt zwei klar getrennte Betriebsmodi:
+
+- **Local-first (Standard und produktive Live-Version):** Die Anwendung läuft vollständig im Browser. Boards, Aufgaben, Benutzerprofile und Einstellungen werden im `localStorage` gespeichert.
+- **PostgreSQL-API (Entwicklungsmodus):** Ein optionaler Node.js-Server erprobt relationale Persistenz und serverseitige Schreiboperationen. Dieser Modus besitzt noch keine produktionsfähige Authentifizierung.
+
+Ohne ausdrücklichen API-Opt-in bleibt der Local-first-Client vollständig unabhängig vom Server.
 
 ## Funktionsumfang
 
@@ -127,6 +132,8 @@ npm run test:e2e
 npm run test:e2e:headed
 ```
 
+Die PostgreSQL-Integrationstests und der vollständige lokale Coverage-Gate benötigen `DATABASE_URL_TEST`. Starte dafür zuerst PostgreSQL mit `docker compose up -d postgres`, führe `npm run db:migrate` aus und setze `DATABASE_URL_TEST` auf die Testdatenbank. Ohne diese Variable werden die Datenbankintegrationen übersprungen; dadurch kann der globale Branch-Coverage-Grenzwert lokal unterschritten werden.
+
 Die Tests decken unter anderem Rendering, State-Operationen, Filter, Persistenz, Berechtigungen, Stages, WIP-Limits, Übergangsregeln, Todos, Fälligkeiten und Undo-Kommandos ab. Die Playwright-Suite prüft zusätzlich in Chromium, Firefox und WebKit den echten Browserstart, das Erstellen und Persistieren einer Aufgabe, Drag-and-drop sowie die Tastaturbedienung eines Dialogs.
 
 ## Technische Architektur
@@ -205,6 +212,8 @@ Die Anwendung setzt moderne Browser-APIs voraus, insbesondere ES-Module, `struct
 ## Server und PostgreSQL
 
 Die Servermigration wird parallel zum weiterhin funktionsfähigen Local-first-Client aufgebaut. Der Node.js-HTTP-Server stellt Liveness, Readiness und eine erste lesende Board-API bereit. Der Browser-Client arbeitet bis zur folgenden Integrationsstufe weiterhin mit seinem lokalen Workspace.
+
+> **Sicherheitsgrenze:** Der Servermodus ist ausschließlich für Entwicklung und kontrollierte Testumgebungen vorgesehen. `DEV_USER_ID` ist eine globale Entwicklungsidentität, keine Anmeldung. Vor einem öffentlichen Betrieb sind mindestens eine pro Request verifizierte Identität, eingeschränktes CORS, Rate Limiting und produktionsgeeignete Security-Header erforderlich. Die HTTP-Schicht akzeptiert bereits einen austauschbaren Request-Identity-Resolver; der mitgelieferte Server verwendet bewusst nur den Development-Adapter.
 
 ### Lokale Datenbank starten
 

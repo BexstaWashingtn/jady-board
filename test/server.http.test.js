@@ -68,6 +68,40 @@ describe("Board-Lese-API", () => {
   const userId = "8acf3017-cf6e-589b-bd47-a1d8ccec16a8";
   const boardId = "46ed3b71-86cb-5eb7-a01e-dd5885e41c6a";
 
+  test("ermittelt die Identitaet pro Request ueber einen Resolver", async () => {
+    const boardService = {
+      async listBoards(value) { return [{ id: boardId, name: value }]; },
+      async getBoard() { return null; },
+    };
+    const server = createServer(createApiHandler({
+      database: { query: async () => ({ rows: [] }) },
+      boardService,
+      resolveIdentity: (request) => request.headers["x-test-user"] === userId ? userId : null,
+    }));
+    const baseUrl = await start(server);
+
+    assert.equal((await fetch(`${baseUrl}/api/boards`)).status, 503);
+    const response = await fetch(`${baseUrl}/api/boards`, { headers: { "X-Test-User": userId } });
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), {
+      currentUserId: userId,
+      boards: [{ id: boardId, name: userId }],
+    });
+  });
+
+  test("weist nicht verifizierbare Request-Identitaeten zurueck", async () => {
+    const boardService = { async listBoards() { return []; }, async getBoard() { return null; } };
+    const resolvers = [() => "not-a-uuid", () => { throw new Error("invalid token"); }];
+    for (const resolveIdentity of resolvers) {
+      const server = createServer(createApiHandler({
+        database: { query: async () => ({ rows: [] }) }, boardService, resolveIdentity,
+      }));
+      const response = await fetch(`${await start(server)}/api/boards`);
+      assert.equal(response.status, 401);
+      assert.equal((await response.json()).error.code, "IDENTITY_REJECTED");
+    }
+  });
+
   test("verlangt eine konfigurierte Entwicklungsidentität", async () => {
     const baseUrl = await listen({ query: async () => ({ rows: [] }) });
     const response = await fetch(`${baseUrl}/api/boards`);
