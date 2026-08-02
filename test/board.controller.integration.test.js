@@ -637,6 +637,26 @@ describe("Board-Controller-Integration", () => {
     assert.equal(controller.getState().columns[0].version, 3);
   });
 
+  test("erstellt Stages im API-Modus mit der Server-Identität", async () => {
+    const state = createInitialBoardState();
+    let received;
+    const workspace = { activeBoardId: "api-board", boards: { "api-board": state }, activeUserId: "user-1", users: { "user-1": { id: "user-1", name: "API User", initials: "AU", preferences: { theme: /** @type {const} */ ("system") } } } };
+    const controller = createBoardController(createApp("#root"), {
+      workspace, persist: () => true, seedShowcase: false,
+      async createStageRemote(_boardId, stage) { received = { id: stage.id, title: stage.title }; return { ...stage, id: "server-stage", version: 1 }; },
+    });
+    controller.actions.openStageConfig();
+    controller.actions.createStage();
+    const form = document.querySelector("#stage-editor");
+    assert.ok(form instanceof HTMLFormElement);
+    form.elements.namedItem("title").value = "QA";
+    await controller.actions.submitStage({ preventDefault() {}, currentTarget: form });
+    assert.equal(received.title, "QA");
+    assert.match(received.id, /^stage-/);
+    assert.equal(controller.getState().columns.at(-1).id, "server-stage");
+    assert.equal(controller.getState().columns.at(-1).version, 1);
+  });
+
   test("erlaubt Mitgliedern freie Tasks zu übernehmen und wieder freizugeben", () => {
     const controller = startController();
     controller.actions.switchUser("user-demo-lukas");

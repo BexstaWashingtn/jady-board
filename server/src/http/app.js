@@ -138,6 +138,22 @@ export function createApiHandler({ database, boardService, currentUserId = null 
       return;
     }
 
+    const createStageMatch = method === "POST" ? url.pathname.match(/^\/api\/boards\/([^/]+)\/stages$/) : null;
+    if (createStageMatch) {
+      if (!boardService || !currentUserId) { sendJson(response, 503, identityUnavailable()); return; }
+      const boardId = decodeURIComponent(createStageMatch[1]);
+      if (!isUuid(boardId)) { sendJson(response, 400, { error: { code: "INVALID_BOARD_ID", message: "Board ID must be a UUID." } }); return; }
+      let body; try { body = await readJson(request); } catch { sendJson(response, 400, { error: { code: "INVALID_JSON", message: "A valid JSON request body is required." } }); return; }
+      try {
+        const result = await boardService.createStage(boardId, currentUserId, body);
+        if (result.status === "created") sendJson(response, 201, { stage: result.stage });
+        else if (result.status === "invalid") sendJson(response, 400, { error: { code: "INVALID_STAGE", message: result.message } });
+        else if (result.status === "forbidden") sendJson(response, 403, { error: { code: "STAGE_CREATE_FORBIDDEN", message: "Stage creation is not permitted." } });
+        else sendJson(response, 404, { error: { code: "BOARD_NOT_FOUND", message: "Board not found." } });
+      } catch { sendJson(response, 500, internalError()); }
+      return;
+    }
+
     const moveMatch = method === "PATCH" ? url.pathname.match(/^\/api\/boards\/([^/]+)\/tasks\/([^/]+)\/position$/) : null;
     if (moveMatch) {
       if (!boardService || !currentUserId) { sendJson(response, 503, identityUnavailable()); return; }

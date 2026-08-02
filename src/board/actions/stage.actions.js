@@ -78,6 +78,15 @@ export function createStageActions(context) {
             throw error;
           });
       }
+      if (!columnId && context.createStageRemote) {
+        return context.createStageRemote(context.workspace.activeBoardId, stage)
+          .then((saved) => { Object.assign(stage, saved); finish(); })
+          .catch((error) => {
+            const index = context.state().columns.indexOf(stage);
+            if (index >= 0) context.state().columns.splice(index, 1);
+            throw error;
+          });
+      }
       finish();
     },
     /** @param {string} columnId @param {number} direction */

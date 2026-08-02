@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 
-import { assignApiTask, createApiTask, deleteApiTask, loadApiWorkspace, moveApiTask, readApiDataSource, syncApiTaskTodos, updateApiStage, updateApiTask } from "../src/board/board.api-client.js";
+import { assignApiTask, createApiStage, createApiTask, deleteApiTask, loadApiWorkspace, moveApiTask, readApiDataSource, syncApiTaskTodos, updateApiStage, updateApiTask } from "../src/board/board.api-client.js";
 
 describe("Board-API-Client", () => {
   test("aktiviert die API ausschließlich per URL-Opt-in", () => {
@@ -117,6 +117,19 @@ describe("Board-API-Client", () => {
     assert.equal(requestBody.version, 1);
     assert.equal(requestBody.color, "#336699");
     assert.equal(saved.version, 2);
+  });
+
+  test("erstellt Stages und übernimmt die Server-Identität", async () => {
+    const stage = { ...boardResponse().columns[0], id: "column-2", taskIds: [] };
+    let received;
+    const saved = await createApiStage("http://api", "board-id", stage, async (url, options) => {
+      received = { url, method: options.method, body: JSON.parse(options.body) };
+      return response({ stage: { ...stage, id: "server-stage-id", version: 1 } }, 201);
+    });
+    assert.equal(received.url, "http://api/api/boards/board-id/stages");
+    assert.equal(received.method, "POST");
+    assert.equal(received.body.title, "Backlog");
+    assert.equal(saved.id, "server-stage-id");
   });
 });
 

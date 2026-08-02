@@ -13,6 +13,7 @@
  * @property {(boardId: string, taskId: string, version: number) => Promise<boolean>} [deleteTask]
  * @property {(boardId: string, stageId: string, userId: string) => Promise<Record<string, any>|null>} [findStageForUser]
  * @property {(boardId: string, stageId: string, version: number, input: Record<string, any>) => Promise<Record<string, any>|null>} [updateStage]
+ * @property {(boardId: string, userId: string, input: Record<string, any>) => Promise<{status: "created", stage: Record<string, any>}|{status: "not_found"|"forbidden"|"invalid_targets"}>} [createStage]
  */
 
 /**
@@ -288,6 +289,40 @@ export function createBoardRepository(database) {
         await client.query(`UPDATE boards SET version = version + 1, updated_at = now() WHERE id = $1`, [boardId]);
         await client.query("COMMIT");
         return { ...updated.rows[0], allowed_target_ids: input.allowedTargetIds };
+      } catch (error) { await client.query("ROLLBACK"); throw error; } finally { client.release(); }
+    },
+
+    async createStage(boardId, userId, input) {
+      if (!("connect" in database) || typeof database.connect !== "function") throw new Error("Transactions are unavailable.");
+      const client = await database.connect();
+      try {
+        await client.query("BEGIN");
+        const contextResult = await client.query(`
+          SELECT bm.role, (SELECT count(*)::int FROM stages s WHERE s.board_id = bm.board_id) AS stage_count
+          FROM board_members bm
+          WHERE bm.board_id = $1 AND bm.user_id = $2
+          FOR UPDATE OF bm
+        `, [boardId, userId]);
+        const context = contextResult.rows[0];
+        if (!context) { await client.query("ROLLBACK"); return { status: "not_found" }; }
+        if (context.role !== "owner") { await client.query("ROLLBACK"); return { status: "forbidden" }; }
+        const targets = input.allowedTargetIds ?? [];
+        if (targets.length) {
+          const targetResult = await client.query(`SELECT count(*)::int AS count FROM stages WHERE board_id = $1 AND id = ANY($2::uuid[])`, [boardId, targets]);
+          if (Number(targetResult.rows[0]?.count) !== new Set(targets).size) { await client.query("ROLLBACK"); return { status: "invalid_targets" }; }
+        }
+        const created = await client.query(`
+          INSERT INTO stages
+            (id, board_id, title, color, kind, position, wip_limit, wip_limit_mode, require_completed_todos, transitions_restricted)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+          RETURNING id, title, color, kind, wip_limit, wip_limit_mode, require_completed_todos, version
+        `, [input.id, boardId, input.title, input.color, input.kind, Number(context.stage_count), input.limit, input.limitMode, input.requireCompletedTodos, input.allowedTargetIds !== null]);
+        for (const targetId of targets) {
+          await client.query(`INSERT INTO stage_transitions (board_id, source_stage_id, target_stage_id) VALUES ($1, $2, $3)`, [boardId, input.id, targetId]);
+        }
+        await client.query(`UPDATE boards SET version = version + 1, updated_at = now() WHERE id = $1`, [boardId]);
+        await client.query("COMMIT");
+        return { status: "created", stage: { ...created.rows[0], allowed_target_ids: input.allowedTargetIds } };
       } catch (error) { await client.query("ROLLBACK"); throw error; } finally { client.release(); }
     },
   };

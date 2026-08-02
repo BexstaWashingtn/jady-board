@@ -11,6 +11,7 @@ import { randomUUID } from "node:crypto";
  * @property {(boardId: string, taskId: string, userId: string, input: unknown) => Promise<{status: "updated", task: Record<string, any>}|{status: "not_found"|"forbidden"|"conflict"}|{status: "invalid", message: string}>} syncTaskTodos
  * @property {(boardId: string, taskId: string, userId: string, version: unknown) => Promise<{status: "deleted"|"not_found"|"forbidden"|"conflict"}|{status: "invalid", message: string}>} deleteTask
  * @property {(boardId: string, stageId: string, userId: string, input: unknown) => Promise<{status: "updated", stage: Record<string, any>}|{status: "not_found"|"forbidden"|"conflict"}|{status: "invalid", message: string}>} updateStage
+ * @property {(boardId: string, userId: string, input: unknown) => Promise<{status: "created", stage: Record<string, any>}|{status: "not_found"|"forbidden"}|{status: "invalid", message: string}>} createStage
  */
 
 /**
@@ -149,7 +150,28 @@ export function createBoardService(repository) {
       if (!row) return { status: "conflict" };
       return { status: "updated", stage: { id: String(row.id), title: String(row.title), color: String(row.color), kind: String(row.kind), limit: row.wip_limit === null ? null : Number(row.wip_limit), limitMode: String(row.wip_limit_mode), requireCompletedTodos: Boolean(row.require_completed_todos), allowedTargetIds: row.allowed_target_ids, version: Number(row.version) } };
     },
+
+    async createStage(boardId, userId, input) {
+      const parsed = parseStageCreate(input);
+      if ("message" in parsed) return { status: "invalid", message: parsed.message };
+      if (!repository.createStage) throw new Error("Stage creation is unavailable.");
+      const result = await repository.createStage(boardId, userId, { id: randomUUID(), ...parsed });
+      if (result.status === "invalid_targets") return { status: "invalid", message: "Stage transitions contain an unknown target." };
+      if (result.status === "not_found") return { status: "not_found" };
+      if (result.status === "forbidden") return { status: "forbidden" };
+      if (result.status !== "created") throw new Error("Unexpected stage creation result.");
+      const row = result.stage;
+      return { status: "created", stage: { id: String(row.id), title: String(row.title), color: String(row.color), kind: String(row.kind), limit: row.wip_limit === null ? null : Number(row.wip_limit), limitMode: String(row.wip_limit_mode), requireCompletedTodos: Boolean(row.require_completed_todos), allowedTargetIds: row.allowed_target_ids, taskIds: [], version: Number(row.version) } };
+    },
   };
+}
+
+/** @param {unknown} input */
+function parseStageCreate(input) {
+  const parsed = parseStageUpdate({ ...(input && typeof input === "object" && !Array.isArray(input) ? input : {}), version: 1 }, "");
+  if ("message" in parsed) return parsed;
+  const { version: _version, ...created } = parsed;
+  return created;
 }
 
 /**
@@ -165,9 +187,9 @@ function parseStageUpdate(input, stageId) {
   if (!title || typeof value.color !== "string" || !/^#[0-9a-f]{6}$/i.test(value.color)) return { message: "Stage title or color is invalid." };
   if (!["backlog", "active", "review", "done"].includes(String(value.kind)) || !["warning", "strict"].includes(String(value.limitMode))) return { message: "Stage kind or limit mode is invalid." };
   if (limit !== null && (!Number.isInteger(limit) || limit < 1)) return { message: "Stage limit is invalid." };
-  if (targets !== null && (!Array.isArray(targets) || targets.some((id) => typeof id !== "string" || id === stageId))) return { message: "Stage transitions are invalid." };
+  if (targets !== null && (!Array.isArray(targets) || targets.some((id) => typeof id !== "string" || !isUuid(id) || id === stageId))) return { message: "Stage transitions are invalid." };
   if (typeof value.requireCompletedTodos !== "boolean" || !Number.isInteger(value.version) || Number(value.version) < 1) return { message: "Stage settings or version are invalid." };
-  return { title, color: value.color, kind: String(value.kind), limit, limitMode: String(value.limitMode), allowedTargetIds: targets, requireCompletedTodos: value.requireCompletedTodos, version: Number(value.version) };
+  return { title, color: value.color, kind: String(value.kind), limit, limitMode: String(value.limitMode), allowedTargetIds: targets === null ? null : [...new Set(targets)], requireCompletedTodos: value.requireCompletedTodos, version: Number(value.version) };
 }
 
 /**

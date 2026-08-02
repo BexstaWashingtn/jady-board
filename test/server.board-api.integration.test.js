@@ -125,6 +125,24 @@ test("erstellt einen Task mit atomarer Servernummer in PostgreSQL", { skip: !dat
   assert.ok(refreshed.columns[0].taskIds.includes(task.id));
 });
 
+test("erstellt eine Stage mit Übergängen in PostgreSQL", { skip: !database }, async () => {
+  const board = (await (await fetch(`${baseUrl}/api/boards/${boardId}`)).json()).board;
+  const target = board.columns[0];
+  const response = await fetch(`${baseUrl}/api/boards/${boardId}/stages`, {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ title: "QA", color: "#336699", kind: "review", limit: 2, limitMode: "strict", allowedTargetIds: [target.id], requireCompletedTodos: true }),
+  });
+  assert.equal(response.status, 201);
+  const stage = (await response.json()).stage;
+  assert.match(stage.id, /^[0-9a-f-]{36}$/);
+  assert.equal(stage.version, 1);
+  assert.deepEqual(stage.allowedTargetIds, [target.id]);
+
+  const refreshed = (await (await fetch(`${baseUrl}/api/boards/${boardId}`)).json()).board;
+  assert.equal(refreshed.columns.at(-1).id, stage.id);
+  assert.deepEqual(refreshed.columns.at(-1).allowedTargetIds, [target.id]);
+});
+
 async function cleanup() {
   if (!database) return;
   await database.query("DELETE FROM workspace_imports WHERE fingerprint = $1", [plan.fingerprint]);

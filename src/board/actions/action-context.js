@@ -35,6 +35,7 @@
  * @property {((boardId: string, task: import("../board.state.js").BoardTask) => Promise<{todos: import("../board.state.js").TaskTodo[], version: number}>)|undefined} syncTaskTodosRemote
  * @property {((boardId: string, task: import("../board.state.js").BoardTask) => Promise<void>)|undefined} deleteTaskRemote
  * @property {((boardId: string, stage: import("../board.state.js").BoardColumn) => Promise<Partial<import("../board.state.js").BoardColumn>>)|undefined} updateStageRemote
+ * @property {((boardId: string, stage: import("../board.state.js").BoardColumn) => Promise<import("../board.state.js").BoardColumn>)|undefined} createStageRemote
  */
 
 export {};

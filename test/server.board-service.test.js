@@ -202,6 +202,23 @@ describe("Board-Service", () => {
     assert.deepEqual(result.status === "updated" && result.stage.allowedTargetIds, [TARGET_STAGE_ID]);
     assert.equal(result.status === "updated" && result.stage.version, 3);
   });
+
+  test("erstellt Stages mit einer Server-ID", async () => {
+    let received;
+    const service = createBoardService({
+      async listForUser() { return []; }, async findForUser() { return null; },
+      async createStage(board, user, input) {
+        received = { board, user, input };
+        return { status: /** @type {const} */ ("created"), stage: { ...input, wip_limit: input.limit, wip_limit_mode: input.limitMode, require_completed_todos: input.requireCompletedTodos, allowed_target_ids: input.allowedTargetIds, version: 1 } };
+      },
+    });
+    const result = await service.createStage(BOARD_ID, USER_ID, { title: "QA", color: "#336699", kind: "review", limit: null, limitMode: "warning", allowedTargetIds: [TARGET_STAGE_ID, TARGET_STAGE_ID], requireCompletedTodos: false });
+    assert.match(received.input.id, /^[0-9a-f-]{36}$/);
+    assert.deepEqual([received.board, received.user], [BOARD_ID, USER_ID]);
+    assert.deepEqual(received.input.allowedTargetIds, [TARGET_STAGE_ID]);
+    assert.equal(result.status === "created" && result.stage.version, 1);
+    assert.deepEqual(result.status === "created" && result.stage.taskIds, []);
+  });
 });
 
 const USER_ID = "8acf3017-cf6e-589b-bd47-a1d8ccec16a8";

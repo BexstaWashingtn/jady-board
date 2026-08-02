@@ -193,6 +193,18 @@ export async function updateApiStage(baseUrl, boardId, stage, request = fetch) {
   return body.stage;
 }
 
+/** @param {string} baseUrl @param {string} boardId @param {import("./board.state.js").BoardColumn} stage @param {typeof fetch} [request] */
+export async function createApiStage(baseUrl, boardId, stage, request = fetch) {
+  const response = await request(`${baseUrl}/api/boards/${encodeURIComponent(boardId)}/stages`, {
+    method: "POST", headers: { Accept: "application/json", "Content-Type": "application/json" },
+    body: JSON.stringify({ title: stage.title, color: stage.color, kind: stage.kind, limit: stage.limit, limitMode: stage.limitMode, allowedTargetIds: stage.allowedTargetIds, requireCompletedTodos: stage.requireCompletedTodos }),
+  });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(String(body?.error?.message ?? `Stage konnte nicht erstellt werden (${response.status}).`));
+  if (!body.stage?.id || Number(body.stage.version) < 1 || !Array.isArray(body.stage.taskIds)) throw new Error("Die Board-API hat eine ungültige Stage zurückgegeben.");
+  return body.stage;
+}
+
 /** @param {typeof fetch} request @param {string} url @returns {Promise<Record<string, any>>} */
 async function getJson(request, url) {
   const response = await request(url, { headers: { Accept: "application/json" } });
