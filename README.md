@@ -214,7 +214,16 @@ Voraussetzungen sind Docker mit Compose-Unterstützung und eine unterstützte No
 docker compose up -d postgres
 ```
 
-Die Standardkonfiguration liegt in `.env.example`. Node.js lädt `.env` nicht automatisch; die Werte müssen vor dem Start als Umgebungsvariablen gesetzt oder mit einem geeigneten Prozessmanager geladen werden.
+Die Standardkonfiguration liegt in `.env.example`. Kopiere sie vor dem ersten
+Start nach `.env`; die npm-Skripte laden diese lokale Datei automatisch. Bereits
+gesetzte Umgebungsvariablen haben weiterhin Vorrang.
+
+```powershell
+Copy-Item .env.example .env
+```
+
+Unter Bash entspricht das `cp .env.example .env`. Die Datei `.env` wird nicht
+in Git eingecheckt.
 
 ```bash
 # Datenbankschema anlegen oder aktualisieren
@@ -248,7 +257,7 @@ Der Browser bleibt standardmäßig Local-first. Die lesende API-Anbindung kann f
 http://127.0.0.1:4173/?data-source=api&api-url=http://127.0.0.1:3000
 ```
 
-Der Client lädt dann die zugänglichen Boards aus PostgreSQL. Der vollständige Task-Lebenszyklus einschließlich Erstellen, Bearbeiten, Verschieben, Zuweisen, Todos und Löschen wird bereits an den Server geschrieben. Änderungen an Boards, Mitgliedern und Stages sind in diesem Zwischenstand nur im Arbeitsspeicher sichtbar; ein Neuladen stellt dafür den Datenbankstand wieder her. Ist die API beim Start nicht erreichbar, verwendet der Client weiterhin den lokalen Workspace.
+Der Client lädt dann die zugänglichen Boards aus PostgreSQL. Der vollständige Task-Lebenszyklus einschließlich Erstellen, Bearbeiten, Statusformular, Drag-and-drop, Zuweisen, Todos und Löschen wird bereits an den Server geschrieben. Änderungen an Boards, Mitgliedern und Stages sind in diesem Zwischenstand nur im Arbeitsspeicher sichtbar; ein Neuladen stellt dafür den Datenbankstand wieder her. Ist die API beim Start nicht erreichbar, verwendet der Client weiterhin den lokalen Workspace.
 
 ### Bestehenden Workspace prüfen und importieren
 
