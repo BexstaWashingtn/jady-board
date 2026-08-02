@@ -177,6 +177,22 @@ export async function deleteApiTask(baseUrl, boardId, task, request = fetch) {
   throw new Error(String(body?.error?.message ?? `Task konnte nicht gelöscht werden (${response.status}).`));
 }
 
+/** @param {string} baseUrl @param {string} boardId @param {import("./board.state.js").BoardColumn} stage @param {typeof fetch} [request] */
+export async function updateApiStage(baseUrl, boardId, stage, request = fetch) {
+  if (!Number.isInteger(stage.version) || Number(stage.version) < 1) throw new Error("Die Stage besitzt keine gültige Server-Version.");
+  const response = await request(`${baseUrl}/api/boards/${encodeURIComponent(boardId)}/stages/${encodeURIComponent(stage.id)}`, {
+    method: "PATCH", headers: { Accept: "application/json", "Content-Type": "application/json" },
+    body: JSON.stringify({ title: stage.title, color: stage.color, kind: stage.kind, limit: stage.limit, limitMode: stage.limitMode, allowedTargetIds: stage.allowedTargetIds, requireCompletedTodos: stage.requireCompletedTodos, version: stage.version }),
+  });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    if (response.status === 409) throw new Error("Die Stage wurde zwischenzeitlich geändert. Bitte lade das Board neu.");
+    throw new Error(String(body?.error?.message ?? `Stage konnte nicht gespeichert werden (${response.status}).`));
+  }
+  if (!body.stage || Number(body.stage.version) < 1) throw new Error("Die Board-API hat eine ungültige Stage zurückgegeben.");
+  return body.stage;
+}
+
 /** @param {typeof fetch} request @param {string} url @returns {Promise<Record<string, any>>} */
 async function getJson(request, url) {
   const response = await request(url, { headers: { Accept: "application/json" } });

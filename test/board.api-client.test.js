@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 
-import { assignApiTask, createApiTask, deleteApiTask, loadApiWorkspace, moveApiTask, readApiDataSource, syncApiTaskTodos, updateApiTask } from "../src/board/board.api-client.js";
+import { assignApiTask, createApiTask, deleteApiTask, loadApiWorkspace, moveApiTask, readApiDataSource, syncApiTaskTodos, updateApiStage, updateApiTask } from "../src/board/board.api-client.js";
 
 describe("Board-API-Client", () => {
   test("aktiviert die API ausschließlich per URL-Opt-in", () => {
@@ -105,6 +105,18 @@ describe("Board-API-Client", () => {
       return { ok: true, status: 204 };
     });
     assert.deepEqual(received, { url: "http://api/api/boards/board-id/tasks/task-id?version=1", method: "DELETE" });
+  });
+
+  test("speichert Stage-Einstellungen versioniert", async () => {
+    const stage = { ...boardResponse().columns[0], color: "#336699" };
+    let requestBody;
+    const saved = await updateApiStage("http://api", "board-id", stage, async (_url, options) => {
+      requestBody = JSON.parse(options.body);
+      return response({ stage: { ...stage, version: 2 } });
+    });
+    assert.equal(requestBody.version, 1);
+    assert.equal(requestBody.color, "#336699");
+    assert.equal(saved.version, 2);
   });
 });
 

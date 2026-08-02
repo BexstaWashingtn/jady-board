@@ -248,7 +248,7 @@ Die API verwendet standardmäßig Port `3000`:
 - `PATCH /api/boards/:boardId/tasks/:taskId/assignment` weist einen Task versioniert zu oder gibt ihn frei und setzt die Owner-/Bearbeiterregeln serverseitig durch.
 - `PATCH /api/boards/:boardId/tasks/:taskId/todos` synchronisiert die Todo-Liste transaktional, normalisiert neue IDs und schützt Änderungen über die Task-Version.
 - `DELETE /api/boards/:boardId/tasks/:taskId?version=...` löscht einen Task als Board-Owner transaktional und schließt die Positionslücke in seiner Stage.
-- `PATCH /api/boards/:boardId/stages/:stageId` aktualisiert Stage-Einstellungen, Übergänge und WIP-Regeln versioniert als Board-Owner. Die Client-Anbindung folgt in der nächsten Integrationsstufe.
+- `PATCH /api/boards/:boardId/stages/:stageId` aktualisiert Stage-Einstellungen, Übergänge und WIP-Regeln versioniert als Board-Owner; der Stage-Editor verwendet diesen Endpunkt im API-Modus.
 
 `DEV_USER_ID` ist eine vorübergehende Entwicklungsidentität und muss der UUID eines importierten Benutzers entsprechen. Sie ersetzt keine spätere Authentifizierung.
 

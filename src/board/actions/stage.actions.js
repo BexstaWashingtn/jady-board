@@ -62,11 +62,23 @@ export function createStageActions(context) {
       const data = new FormData(event.currentTarget);
       const columnId = String(data.get("columnId") ?? "");
       const input = { title: data.get("title"), color: data.get("color"), kind: data.get("kind"), limit: data.get("limit"), limitMode: data.get("limitMode"), allowedTargetIds: data.getAll("allowedTargetIds"), requireCompletedTodos: data.get("requireCompletedTodos") === "true" };
-      if (columnId) updateColumn(context.state(), columnId, input);
-      else addColumn(context.state(), input);
-      context.viewState().stageEditor = null;
-      context.saveState();
-      context.render();
+      const previous = columnId ? structuredClone(context.state().columns.find(({ id }) => id === columnId)) : null;
+      const stage = columnId ? updateColumn(context.state(), columnId, input) : addColumn(context.state(), input);
+      const finish = () => {
+        context.viewState().stageEditor = null;
+        context.saveState();
+        context.render();
+      };
+      if (columnId && context.updateStageRemote) {
+        return context.updateStageRemote(context.workspace.activeBoardId, stage)
+          .then((saved) => { Object.assign(stage, saved); finish(); })
+          .catch((error) => {
+            const index = context.state().columns.findIndex(({ id }) => id === columnId);
+            if (previous && index >= 0) context.state().columns[index] = previous;
+            throw error;
+          });
+      }
+      finish();
     },
     /** @param {string} columnId @param {number} direction */
     moveStage(columnId, direction) {

@@ -618,6 +618,25 @@ describe("Board-Controller-Integration", () => {
     controller.destroy();
   });
 
+  test("persistiert Stage-Einstellungen im API-Modus", async () => {
+    const state = createInitialBoardState();
+    state.columns[0].version = 2;
+    let received;
+    const workspace = { activeBoardId: "api-board", boards: { "api-board": state }, activeUserId: "user-1", users: { "user-1": { id: "user-1", name: "API User", initials: "AU", preferences: { theme: /** @type {const} */ ("system") } } } };
+    const controller = createBoardController(createApp("#root"), {
+      workspace, persist: () => true, seedShowcase: false,
+      async updateStageRemote(_boardId, stage) { received = { title: stage.title, version: stage.version }; return { version: 3 }; },
+    });
+    controller.actions.openStageConfig();
+    controller.actions.editStage("backlog");
+    const form = document.querySelector("#stage-editor");
+    assert.ok(form instanceof HTMLFormElement);
+    form.elements.namedItem("title").value = "Ideen";
+    await controller.actions.submitStage({ preventDefault() {}, currentTarget: form });
+    assert.deepEqual(received, { title: "Ideen", version: 2 });
+    assert.equal(controller.getState().columns[0].version, 3);
+  });
+
   test("erlaubt Mitgliedern freie Tasks zu übernehmen und wieder freizugeben", () => {
     const controller = startController();
     controller.actions.switchUser("user-demo-lukas");
