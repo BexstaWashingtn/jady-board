@@ -71,7 +71,7 @@ export function createStageActions(context) {
       };
       if (columnId && context.updateStageRemote) {
         return context.updateStageRemote(context.workspace.activeBoardId, stage)
-          .then((saved) => { Object.assign(stage, saved); finish(); })
+          .then((saved) => { Object.assign(stage, saved); incrementBoardVersion(context.state()); finish(); })
           .catch((error) => {
             const index = context.state().columns.findIndex(({ id }) => id === columnId);
             if (previous && index >= 0) context.state().columns[index] = previous;
@@ -80,7 +80,7 @@ export function createStageActions(context) {
       }
       if (!columnId && context.createStageRemote) {
         return context.createStageRemote(context.workspace.activeBoardId, stage)
-          .then((saved) => { Object.assign(stage, saved); finish(); })
+          .then((saved) => { Object.assign(stage, saved); incrementBoardVersion(context.state()); finish(); })
           .catch((error) => {
             const index = context.state().columns.indexOf(stage);
             if (index >= 0) context.state().columns.splice(index, 1);
@@ -101,7 +101,7 @@ export function createStageActions(context) {
       if (stage && context.moveStageRemote) {
         context.render();
         return context.moveStageRemote(context.workspace.activeBoardId, stage, targetIndex)
-          .then((saved) => { stage.version = saved.version; context.saveState(); context.render(); })
+          .then((saved) => { stage.version = saved.version; if (previous.indexOf(stage) !== targetIndex) incrementBoardVersion(state); context.saveState(); context.render(); })
           .catch((error) => { state.columns.splice(0, state.columns.length, ...previous); context.render(); throw error; });
       }
       context.saveState();
@@ -129,6 +129,7 @@ export function createStageActions(context) {
               const task = state.tasks[taskId];
               if (task && Number.isInteger(task.version)) task.version = Number(task.version) + 1;
             });
+            incrementBoardVersion(state);
             context.saveState(); context.render();
           })
           .catch((error) => { context.setState(previous); context.saveState(); context.render(); throw error; });
@@ -137,4 +138,9 @@ export function createStageActions(context) {
       context.render();
     },
   };
+}
+
+/** @param {import("../board.state.js").BoardState} state */
+function incrementBoardVersion(state) {
+  if (Number.isInteger(state.version)) state.version = Number(state.version) + 1;
 }

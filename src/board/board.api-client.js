@@ -235,6 +235,22 @@ export async function deleteApiStage(baseUrl, boardId, stage, moveTasksTo, reque
   throw new Error(String(body?.error?.message ?? `Stage konnte nicht gelöscht werden (${response.status}).`));
 }
 
+/** @param {string} baseUrl @param {string} boardId @param {import("./board.state.js").BoardState} state @param {typeof fetch} [request] */
+export async function updateApiBoard(baseUrl, boardId, state, request = fetch) {
+  if (!Number.isInteger(state.version) || Number(state.version) < 1) throw new Error("Das Board besitzt keine gültige Server-Version.");
+  const response = await request(`${baseUrl}/api/boards/${encodeURIComponent(boardId)}`, {
+    method: "PATCH", headers: { Accept: "application/json", "Content-Type": "application/json" },
+    body: JSON.stringify({ name: state.project.name, path: state.project.path, description: state.project.description, version: state.version }),
+  });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    if (response.status === 409) throw new Error("Das Board wurde zwischenzeitlich geändert. Bitte lade es neu.");
+    throw new Error(String(body?.error?.message ?? `Board konnte nicht gespeichert werden (${response.status}).`));
+  }
+  if (!body.board?.name || Number(body.board.version) < 1) throw new Error("Die Board-API hat ungültige Board-Metadaten zurückgegeben.");
+  return body.board;
+}
+
 /** @param {typeof fetch} request @param {string} url @returns {Promise<Record<string, any>>} */
 async function getJson(request, url) {
   const response = await request(url, { headers: { Accept: "application/json" } });
@@ -245,6 +261,7 @@ async function getJson(request, url) {
 /** @param {Record<string, any>} board @returns {import("./board.state.js").BoardState} */
 function toBoardState(board) {
   return {
+    version: Number(board.version),
     project: {
       name: String(board.project.name), path: String(board.project.path),
       description: String(board.project.description), ownerId: String(board.project.ownerId),

@@ -202,6 +202,25 @@ describe("Board-Controller-Integration", () => {
     assert.equal(saved.boards["board-1"].project.description, "Release-Steuerung");
   });
 
+  test("persistiert Board-Metadaten im API-Modus", async () => {
+    const state = createInitialBoardState();
+    state.version = 2;
+    let received;
+    const workspace = { activeBoardId: "api-board", boards: { "api-board": state }, activeUserId: "user-1", users: { "user-1": { id: "user-1", name: "API User", initials: "AU", preferences: { theme: /** @type {const} */ ("system") } } } };
+    const controller = createBoardController(createApp("#root"), {
+      workspace, persist: () => true, seedShowcase: false,
+      async updateBoardRemote(_boardId, board) { received = { name: board.project.name, version: board.version }; return { name: board.project.name, path: board.project.path, description: board.project.description, version: 3 }; },
+    });
+    controller.actions.openBoardConfig();
+    const form = document.querySelector(".board-details-form");
+    assert.ok(form instanceof HTMLFormElement);
+    form.elements.namedItem("name").value = "Delivery";
+    await controller.actions.submitBoardDetails({ preventDefault() {}, currentTarget: form });
+    assert.deepEqual(received, { name: "Delivery", version: 2 });
+    assert.equal(controller.getState().project.name, "Delivery");
+    assert.equal(controller.getState().version, 3);
+  });
+
   test("warnt dauerhaft bei einem Speicherfehler und erlaubt einen erneuten Versuch", () => {
     const controller = startController();
     const workingStorage = localStorage;

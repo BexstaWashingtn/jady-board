@@ -105,6 +105,7 @@ export function createTaskActions(context) {
           if (column && index >= 0) column.taskIds[index] = saved.id;
           delete state.tasks[temporaryId];
           state.tasks[saved.id] = { ...created, ...saved, id: saved.id };
+          incrementBoardVersion(state);
         } catch (error) {
           const column = state.columns.find(({ id }) => id === columnId);
           if (column) column.taskIds = column.taskIds.filter((id) => id !== temporaryId);
@@ -179,6 +180,7 @@ export function createTaskActions(context) {
             const targetIndex = state.columns.find(({ id }) => id === targetColumnId)?.taskIds.indexOf(taskId) ?? 0;
             const saved = await context.moveTaskRemote(context.workspace.activeBoardId, state.tasks[taskId], targetColumnId, targetIndex);
             state.tasks[taskId].version = saved.version;
+            incrementBoardVersion(state);
           } catch (error) {
             state.columns = previousColumns;
             state.tasks[taskId].version = previousVersion;
@@ -238,7 +240,7 @@ export function createTaskActions(context) {
       const deleted = structuredClone(state.tasks[taskId]);
       removeTask(state, taskId);
       if (context.deleteTaskRemote) {
-        try { await context.deleteTaskRemote(context.workspace.activeBoardId, deleted); }
+        try { await context.deleteTaskRemote(context.workspace.activeBoardId, deleted); incrementBoardVersion(state); }
         catch (error) { applyUndo(state, undo); throw error; }
       }
       if (context.viewState().selectedTaskId === taskId) context.viewState().selectedTaskId = null;
@@ -248,6 +250,11 @@ export function createTaskActions(context) {
       context.render();
     },
   };
+}
+
+/** @param {import("../board.state.js").BoardState} state */
+function incrementBoardVersion(state) {
+  if (Number.isInteger(state.version)) state.version = Number(state.version) + 1;
 }
 
 /** @param {import("./action-context.js").BoardActionContext} context @param {import("../board.state.js").BoardState} state @param {string} taskId @param {string|null} previous */

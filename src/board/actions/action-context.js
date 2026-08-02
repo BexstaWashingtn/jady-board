@@ -38,6 +38,7 @@
  * @property {((boardId: string, stage: import("../board.state.js").BoardColumn) => Promise<import("../board.state.js").BoardColumn>)|undefined} createStageRemote
  * @property {((boardId: string, stage: import("../board.state.js").BoardColumn, targetIndex: number) => Promise<{position: number, version: number}>)|undefined} moveStageRemote
  * @property {((boardId: string, stage: import("../board.state.js").BoardColumn, moveTasksTo: string|null) => Promise<void>)|undefined} deleteStageRemote
+ * @property {((boardId: string, state: import("../board.state.js").BoardState) => Promise<{name: string, path: string, description: string, version: number}>)|undefined} updateBoardRemote
  */
 
 export {};

@@ -16,6 +16,8 @@
  * @property {(boardId: string, userId: string, input: Record<string, any>) => Promise<{status: "created", stage: Record<string, any>}|{status: "not_found"|"forbidden"|"invalid_targets"}>} [createStage]
  * @property {(boardId: string, stageId: string, targetIndex: number, version: number) => Promise<Record<string, any>|null>} [moveStage]
  * @property {(boardId: string, stageId: string, version: number, moveTasksTo: string|null) => Promise<"deleted"|"conflict"|"last_stage"|"invalid_target"|"wip_limit">} [deleteStage]
+ * @property {(boardId: string, userId: string) => Promise<Record<string, any>|null>} [findBoardForUser]
+ * @property {(boardId: string, version: number, input: {name: string, path: string, description: string}) => Promise<Record<string, any>|null>} [updateBoardMetadata]
  */
 
 /**
@@ -37,6 +39,20 @@ export function createBoardRepository(database) {
         ORDER BY lower(b.name), b.id
       `, [userId]);
       return result.rows;
+    },
+
+    async findBoardForUser(boardId, userId) {
+      const result = await database.query(`SELECT b.id, b.version, bm.role FROM boards b JOIN board_members bm ON bm.board_id = b.id AND bm.user_id = $2 WHERE b.id = $1`, [boardId, userId]);
+      return result.rows[0] ?? null;
+    },
+
+    async updateBoardMetadata(boardId, version, input) {
+      const result = await database.query(`
+        UPDATE boards SET name = $3, path = $4, description = $5, version = version + 1, updated_at = now()
+        WHERE id = $1 AND version = $2
+        RETURNING id, name, path, description, version
+      `, [boardId, version, input.name, input.path, input.description]);
+      return result.rows[0] ?? null;
     },
 
     async findForUser(boardId, userId) {

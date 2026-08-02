@@ -82,6 +82,23 @@ export function createApiHandler({ database, boardService, currentUserId = null 
       return;
     }
 
+    const updateBoardMatch = method === "PATCH" ? url.pathname.match(/^\/api\/boards\/([^/]+)$/) : null;
+    if (updateBoardMatch) {
+      if (!boardService || !currentUserId) { sendJson(response, 503, identityUnavailable()); return; }
+      const boardId = decodeURIComponent(updateBoardMatch[1]);
+      if (!isUuid(boardId)) { sendJson(response, 400, { error: { code: "INVALID_BOARD_ID", message: "Board ID must be a UUID." } }); return; }
+      let body; try { body = await readJson(request); } catch { sendJson(response, 400, { error: { code: "INVALID_JSON", message: "A valid JSON request body is required." } }); return; }
+      try {
+        const result = await boardService.updateBoard(boardId, currentUserId, body);
+        if (result.status === "updated") sendJson(response, 200, { board: result.board });
+        else if (result.status === "invalid") sendJson(response, 400, { error: { code: "INVALID_BOARD", message: result.message } });
+        else if (result.status === "forbidden") sendJson(response, 403, { error: { code: "BOARD_UPDATE_FORBIDDEN", message: "Board update is not permitted." } });
+        else if (result.status === "conflict") sendJson(response, 409, { error: { code: "BOARD_VERSION_CONFLICT", message: "Board has been changed by another request." } });
+        else sendJson(response, 404, { error: { code: "BOARD_NOT_FOUND", message: "Board not found." } });
+      } catch { sendJson(response, 500, internalError()); }
+      return;
+    }
+
     const createTaskMatch = method === "POST" ? url.pathname.match(/^\/api\/boards\/([^/]+)\/tasks$/) : null;
     if (createTaskMatch) {
       if (!boardService || !currentUserId) { sendJson(response, 503, identityUnavailable()); return; }

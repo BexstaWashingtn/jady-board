@@ -64,6 +64,20 @@ test("liefert importierte Boards durch den vollständigen Lese-API-Stack", { ski
   assert.equal(board.columns[0].taskIds.length, 1);
 });
 
+test("persistiert Board-Metadaten mit Versionsschutz in PostgreSQL", { skip: !database }, async () => {
+  const board = (await (await fetch(`${baseUrl}/api/boards/${boardId}`)).json()).board;
+  const response = await fetch(`${baseUrl}/api/boards/${boardId}`, {
+    method: "PATCH", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name: "Delivery API", path: "Boards / Delivery API", description: "Versioniert", version: board.version }),
+  });
+  assert.equal(response.status, 200);
+  const updated = (await response.json()).board;
+  assert.equal(updated.name, "Delivery API");
+  assert.equal(updated.version, board.version + 1);
+  const refreshed = (await (await fetch(`${baseUrl}/api/boards/${boardId}`)).json()).board;
+  assert.equal(refreshed.project.description, "Versioniert");
+});
+
 test("persistiert Task-Metadaten mit Versionsschutz in PostgreSQL", { skip: !database }, async () => {
   const detailResponse = await fetch(`${baseUrl}/api/boards/${boardId}`);
   const { board } = await detailResponse.json();

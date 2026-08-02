@@ -6,7 +6,7 @@
 /** @typedef {{ name: string, path: string, description: string, ownerId: string, memberIds: string[] }} BoardProject */
 /** @typedef {{ query: string, priority: string, category: string, assigneeId: string }} BoardFilters */
 /** @typedef {{ type: "move-task", taskId: string, columnId: string, index: number } | { type: "delete-task", task: BoardTask, columnId: string, index: number }} UndoCommand */
-/** @typedef {{ project: BoardProject, columns: BoardColumn[], tasks: Record<string, BoardTask> }} BoardState */
+/** @typedef {{ project: BoardProject, columns: BoardColumn[], tasks: Record<string, BoardTask>, version?: number }} BoardState */
 /** @typedef {{ title: unknown, category: unknown, priority: unknown, assigneeId?: unknown, dueDate?: unknown, columnId: string }} NewTaskInput */
 
 export const BOARD_STORAGE_KEY = "jadydoco.board";

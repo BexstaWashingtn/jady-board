@@ -79,6 +79,7 @@ export function createDragDropActions(context) {
         return context.moveTaskRemote(context.workspace.activeBoardId, state.tasks[taskId], columnId, targetPosition)
           .then((saved) => {
             state.tasks[taskId].version = saved.version;
+            if (undo.columnId !== columnId && Number.isInteger(state.version)) state.version = Number(state.version) + 1;
             context.registerNotice(`${taskId} wurde nach „${context.columnTitle(columnId)}“ verschoben.`);
             finish();
           })

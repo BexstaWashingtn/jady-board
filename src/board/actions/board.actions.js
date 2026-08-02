@@ -63,6 +63,7 @@ export function createBoardActions(context) {
       const name = String(data.get("name") ?? "").trim();
       if (!name) return;
       const state = context.state();
+      const previous = structuredClone(state);
       const { workspace } = context;
       state.project.name = name;
       state.project.description = String(data.get("description") ?? "").trim();
@@ -76,6 +77,12 @@ export function createBoardActions(context) {
         if (task.assigneeId && !boardMembers.has(task.assigneeId)) task.assigneeId = null;
       });
       context.viewState().boardConfigOpen = false;
+      if (context.updateBoardRemote) {
+        context.render();
+        return context.updateBoardRemote(workspace.activeBoardId, state)
+          .then((saved) => { state.project.name = saved.name; state.project.path = saved.path; state.project.description = saved.description; state.version = saved.version; context.saveState(); context.render(); })
+          .catch((error) => { context.setState(previous); context.saveState(); context.render(); throw error; });
+      }
       context.saveState();
       context.render();
     },

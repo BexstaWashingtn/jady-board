@@ -14,6 +14,7 @@ import { randomUUID } from "node:crypto";
  * @property {(boardId: string, userId: string, input: unknown) => Promise<{status: "created", stage: Record<string, any>}|{status: "not_found"|"forbidden"}|{status: "invalid", message: string}>} createStage
  * @property {(boardId: string, stageId: string, userId: string, input: unknown) => Promise<{status: "moved", stage: Record<string, any>}|{status: "not_found"|"forbidden"|"conflict"}|{status: "invalid", message: string}>} moveStage
  * @property {(boardId: string, stageId: string, userId: string, input: unknown) => Promise<{status: "deleted"|"not_found"|"forbidden"|"conflict"}|{status: "rejected", code: string, message: string}|{status: "invalid", message: string}>} deleteStage
+ * @property {(boardId: string, userId: string, input: unknown) => Promise<{status: "updated", board: Record<string, any>}|{status: "not_found"|"forbidden"|"conflict"}|{status: "invalid", message: string}>} updateBoard
  */
 
 /**
@@ -40,6 +41,19 @@ export function createBoardService(repository) {
       const data = await repository.findForUser(boardId, userId);
       if (!data) return null;
       return mapBoard(data);
+    },
+
+    async updateBoard(boardId, userId, input) {
+      const parsed = parseBoardUpdate(input);
+      if ("message" in parsed) return { status: "invalid", message: parsed.message };
+      if (!repository.findBoardForUser || !repository.updateBoardMetadata) throw new Error("Board writes are unavailable.");
+      const current = await repository.findBoardForUser(boardId, userId);
+      if (!current) return { status: "not_found" };
+      if (current.role !== "owner") return { status: "forbidden" };
+      if (Number(current.version) !== parsed.version) return { status: "conflict" };
+      const row = await repository.updateBoardMetadata(boardId, parsed.version, parsed);
+      if (!row) return { status: "conflict" };
+      return { status: "updated", board: { id: String(row.id), name: String(row.name), path: String(row.path), description: String(row.description), version: Number(row.version) } };
     },
 
     async updateTask(boardId, taskId, userId, input) {
@@ -195,6 +209,21 @@ export function createBoardService(repository) {
       return { status: "rejected", code: "INVALID_TARGET_STAGE", message: "A valid target stage is required for existing tasks." };
     },
   };
+}
+
+/**
+ * @param {unknown} input
+ * @returns {{message: string}|{name: string, path: string, description: string, version: number}}
+ */
+function parseBoardUpdate(input) {
+  if (!input || typeof input !== "object" || Array.isArray(input)) return { message: "A JSON object is required." };
+  const value = /** @type {Record<string, unknown>} */ (input);
+  const name = typeof value.name === "string" ? value.name.trim() : "";
+  const path = typeof value.path === "string" ? value.path.trim() : "";
+  const description = typeof value.description === "string" ? value.description.trim() : "";
+  if (!name || name.length > 200 || !path || path.length > 500 || description.length > 5000) return { message: "Board metadata is invalid." };
+  if (!Number.isInteger(value.version) || Number(value.version) < 1) return { message: "Board version must be a positive integer." };
+  return { name, path, description, version: Number(value.version) };
 }
 
 /**

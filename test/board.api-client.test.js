@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 
-import { assignApiTask, createApiStage, createApiTask, deleteApiStage, deleteApiTask, loadApiWorkspace, moveApiStage, moveApiTask, readApiDataSource, syncApiTaskTodos, updateApiStage, updateApiTask } from "../src/board/board.api-client.js";
+import { assignApiTask, createApiStage, createApiTask, deleteApiStage, deleteApiTask, loadApiWorkspace, moveApiStage, moveApiTask, readApiDataSource, syncApiTaskTodos, updateApiBoard, updateApiStage, updateApiTask } from "../src/board/board.api-client.js";
 
 describe("Board-API-Client", () => {
   test("aktiviert die API ausschließlich per URL-Opt-in", () => {
@@ -22,6 +22,7 @@ describe("Board-API-Client", () => {
     assert.deepEqual(requests, ["http://api/api/boards", "http://api/api/boards/board-id"]);
     assert.equal(workspace.activeBoardId, "board-id");
     assert.equal(workspace.activeUserId, "user-id");
+    assert.equal(workspace.boards["board-id"].version, 1);
     assert.equal(workspace.boards["board-id"].tasks["task-id"].title, "API Task");
     assert.deepEqual(workspace.users["user-id"].preferences, { theme: "system" });
   });
@@ -153,6 +154,17 @@ describe("Board-API-Client", () => {
     assert.equal(received.url, "http://api/api/boards/board-id/stages/stage-id");
     assert.equal(received.method, "DELETE");
     assert.deepEqual(received.body, { version: 1, moveTasksTo: "target-stage" });
+  });
+
+  test("speichert Board-Metadaten versioniert", async () => {
+    const state = { ...boardResponse(), project: { ...boardResponse().project, name: "Delivery" } };
+    let requestBody;
+    const saved = await updateApiBoard("http://api", "board-id", state, async (_url, options) => {
+      requestBody = JSON.parse(options.body);
+      return response({ board: { id: "board-id", name: "Delivery", path: "Boards / Delivery", description: "Test", version: 2 } });
+    });
+    assert.deepEqual(requestBody, { name: "Delivery", path: "/api", description: "Test", version: 1 });
+    assert.equal(saved.version, 2);
   });
 });
 

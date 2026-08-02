@@ -53,6 +53,18 @@ describe("Board-Service", () => {
     });
     assert.equal(await service.getBoard(BOARD_ID, USER_ID), null);
   });
+
+  test("aktualisiert Board-Metadaten ausschließlich versioniert als Owner", async () => {
+    let received;
+    const service = createBoardService({
+      async listForUser() { return []; }, async findForUser() { return null; },
+      async findBoardForUser() { return { id: BOARD_ID, version: 2, role: "owner" }; },
+      async updateBoardMetadata(...args) { received = args; return { id: BOARD_ID, name: "Delivery", path: "Boards / Delivery", description: "Plan", version: 3 }; },
+    });
+    const result = await service.updateBoard(BOARD_ID, USER_ID, { name: " Delivery ", path: "Boards / Delivery", description: "Plan", version: 2 });
+    assert.deepEqual(received, [BOARD_ID, 2, { name: "Delivery", path: "Boards / Delivery", description: "Plan", version: 2 }]);
+    assert.equal(result.status === "updated" && result.board.version, 3);
+  });
   test("aktualisiert Task-Metadaten mit optimistischer Versionsprüfung", async () => {
     let received;
     const service = createBoardService({
