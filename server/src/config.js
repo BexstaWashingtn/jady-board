@@ -7,6 +7,7 @@ const DEFAULT_PORT = 3000;
  * @property {string} databaseUrl
  * @property {boolean} databaseSsl
  * @property {string|null} devUserId
+ * @property {string|null} corsOrigin
  */
 
 /**
@@ -37,5 +38,19 @@ export function loadConfig(environment = process.env) {
     databaseUrl,
     databaseSsl: environment.DATABASE_SSL === "true",
     devUserId,
+    corsOrigin: parseCorsOrigin(environment.CORS_ORIGIN),
   };
+}
+
+/** @param {string|undefined} value */
+function parseCorsOrigin(value) {
+  const origin = value?.trim();
+  if (!origin) return null;
+  if (origin === "*") throw new Error("CORS_ORIGIN must be an explicit http(s) origin.");
+  let parsed;
+  try { parsed = new URL(origin); } catch { throw new Error("CORS_ORIGIN must be a valid http(s) origin."); }
+  if (!["http:", "https:"].includes(parsed.protocol) || parsed.origin !== origin) {
+    throw new Error("CORS_ORIGIN must be a valid http(s) origin.");
+  }
+  return parsed.origin;
 }

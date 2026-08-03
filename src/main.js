@@ -1,6 +1,7 @@
 import { createApp } from "./core/JaDyDoCo.js";
 import { createBoardController } from "./board/board.controller.js";
 import { assignApiTask, createApiStage, createApiTask, deleteApiStage, deleteApiTask, loadApiWorkspace, moveApiStage, moveApiTask, readApiDataSource, syncApiTaskTodos, updateApiBoard, updateApiStage, updateApiTask } from "./board/board.api-client.js";
+import { createApiUnavailablePage } from "./templates/api-unavailable.map.js";
 
 const app = createApp("#root");
 const apiSource = readApiDataSource(window.location);
@@ -23,8 +24,17 @@ if (apiSource) {
       updateBoardRemote: (boardId, state) => updateApiBoard(apiSource, boardId, state),
     });
   } catch (error) {
-    console.warn("JaDy Board API could not be loaded; using the local workspace.", error);
-    createBoardController(app);
+    console.warn("JaDy Board API could not be loaded.", error);
+    app.replace(createApiUnavailablePage({
+      apiSource,
+      retry: () => window.location.reload(),
+      useLocal: () => {
+        const url = new URL(window.location.href);
+        url.searchParams.delete("data-source");
+        url.searchParams.delete("api-url");
+        window.location.assign(url);
+      },
+    }));
   }
 } else {
   createBoardController(app);

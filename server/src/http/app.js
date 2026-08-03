@@ -1,12 +1,13 @@
 import { isUuid, readJson, sendJson as writeJson, sendNoContent } from "./http.js";
 import { createDevelopmentIdentityResolver } from "./request-identity.js";
 
-const JSON_HEADERS = {
+const BASE_HEADERS = {
   "Content-Type": "application/json; charset=utf-8",
   "Cache-Control": "no-store",
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, PATCH, DELETE, OPTIONS",
-  "Access-Control-Allow-Headers": "Accept, Content-Type",
+  "X-Content-Type-Options": "nosniff",
+  "X-Frame-Options": "DENY",
+  "Referrer-Policy": "no-referrer",
+  "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
 };
 
 /**
@@ -15,16 +16,33 @@ const JSON_HEADERS = {
  *   boardService?: import("../modules/boards/board.service.js").BoardService,
  *   currentUserId?: string|null,
  *   resolveIdentity?: import("./request-identity.js").RequestIdentityResolver
+ *   corsOrigin?: string|null
  * }} dependencies
  * @returns {import("node:http").RequestListener}
  */
-export function createApiHandler({ database, boardService, currentUserId = null, resolveIdentity = createDevelopmentIdentityResolver(currentUserId) }) {
+export function createApiHandler({ database, boardService, currentUserId = null, resolveIdentity = createDevelopmentIdentityResolver(currentUserId), corsOrigin = null }) {
   return async function apiHandler(request, response) {
     const method = request.method ?? "GET";
     const url = new URL(request.url ?? "/", "http://localhost");
+    const requestOrigin = request.headers.origin ?? null;
+    const corsAllowed = requestOrigin === null || requestOrigin === corsOrigin;
+    const responseHeaders = corsAllowed && requestOrigin
+      ? { ...BASE_HEADERS, "Access-Control-Allow-Origin": requestOrigin, "Vary": "Origin" }
+      : BASE_HEADERS;
+    /** @param {import("node:http").ServerResponse} target @param {number} status @param {unknown} body */
+    const sendJson = (target, status, body) => writeJson(target, status, body, responseHeaders);
+
+    if (!corsAllowed) {
+      sendJson(response, 403, { error: { code: "ORIGIN_NOT_ALLOWED", message: "Request origin is not allowed." } });
+      return;
+    }
 
     if (method === "OPTIONS") {
-      response.writeHead(204, JSON_HEADERS);
+      response.writeHead(204, {
+        ...responseHeaders,
+        "Access-Control-Allow-Methods": "GET, POST, PATCH, DELETE, OPTIONS",
+        "Access-Control-Allow-Headers": "Accept, Content-Type",
+      });
       response.end();
       return;
     }
@@ -145,7 +163,7 @@ export function createApiHandler({ database, boardService, currentUserId = null,
       if (!isUuid(boardId) || !isUuid(taskId)) { sendJson(response, 400, { error: { code: "INVALID_RESOURCE_ID", message: "Board and task IDs must be UUIDs." } }); return; }
       try {
         const result = await boardService.deleteTask(boardId, taskId, requestUserId, url.searchParams.get("version"));
-        if (result.status === "deleted") sendNoContent(response, JSON_HEADERS);
+        if (result.status === "deleted") sendNoContent(response, responseHeaders);
         else if (result.status === "invalid") sendJson(response, 400, { error: { code: "INVALID_TASK_VERSION", message: result.message } });
         else if (result.status === "forbidden") sendJson(response, 403, { error: { code: "TASK_DELETE_FORBIDDEN", message: "Task deletion is not permitted." } });
         else if (result.status === "conflict") sendJson(response, 409, { error: { code: "TASK_VERSION_CONFLICT", message: "Task has been changed by another request." } });
@@ -212,7 +230,7 @@ export function createApiHandler({ database, boardService, currentUserId = null,
       let body; try { body = await readJson(request); } catch { sendJson(response, 400, { error: { code: "INVALID_JSON", message: "A valid JSON request body is required." } }); return; }
       try {
         const result = await boardService.deleteStage(boardId, stageId, requestUserId, body);
-        if (result.status === "deleted") sendNoContent(response, JSON_HEADERS);
+        if (result.status === "deleted") sendNoContent(response, responseHeaders);
         else if (result.status === "invalid") sendJson(response, 400, { error: { code: "INVALID_STAGE_DELETE", message: result.message } });
         else if (result.status === "forbidden") sendJson(response, 403, { error: { code: "STAGE_DELETE_FORBIDDEN", message: "Stage deletion is not permitted." } });
         else if (result.status === "conflict") sendJson(response, 409, { error: { code: "STAGE_VERSION_CONFLICT", message: "Stage has been changed by another request." } });
@@ -351,13 +369,4 @@ function internalError() {
       message: "The request could not be completed.",
     },
   };
-}
-
-/**
- * @param {import("node:http").ServerResponse} response
- * @param {number} status
- * @param {unknown} body
- */
-function sendJson(response, status, body) {
-  writeJson(response, status, body, JSON_HEADERS);
 }

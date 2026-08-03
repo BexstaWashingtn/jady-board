@@ -19,6 +19,27 @@ describe("Server-Health-API", () => {
     assert.equal(response.status, 200);
     assert.deepEqual(await response.json(), { status: "ok" });
     assert.match(response.headers.get("content-type") ?? "", /application\/json/);
+    assert.equal(response.headers.get("x-content-type-options"), "nosniff");
+    assert.equal(response.headers.get("x-frame-options"), "DENY");
+    assert.equal(response.headers.get("referrer-policy"), "no-referrer");
+  });
+
+  test("erlaubt nur den explizit konfigurierten Browser-Origin", async () => {
+    const server = createServer(createApiHandler({
+      database: { query: async () => ({ rows: [] }) },
+      corsOrigin: "https://board.example.com",
+    }));
+    const baseUrl = await start(server);
+
+    const allowed = await fetch(`${baseUrl}/api/health`, { headers: { Origin: "https://board.example.com" } });
+    assert.equal(allowed.status, 200);
+    assert.equal(allowed.headers.get("access-control-allow-origin"), "https://board.example.com");
+    assert.equal(allowed.headers.get("vary"), "Origin");
+
+    const rejected = await fetch(`${baseUrl}/api/health`, { headers: { Origin: "https://evil.example" } });
+    assert.equal(rejected.status, 403);
+    assert.equal((await rejected.json()).error.code, "ORIGIN_NOT_ALLOWED");
+    assert.equal(rejected.headers.get("access-control-allow-origin"), null);
   });
 
   test("meldet eine erreichbare Datenbank als bereit", async () => {

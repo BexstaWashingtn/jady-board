@@ -19,6 +19,7 @@ export function createJaDyServer(config) {
     database,
     boardService,
     resolveIdentity: createDevelopmentIdentityResolver(config.devUserId),
+    corsOrigin: config.corsOrigin,
   }));
 
   async function close() {

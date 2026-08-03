@@ -11,6 +11,10 @@ Das Repository unterstützt zwei klar getrennte Betriebsmodi:
 
 Ohne ausdrücklichen API-Opt-in bleibt der Local-first-Client vollständig unabhängig vom Server.
 
+Kann ein ausdrücklich ausgewählter API-Workspace nicht geladen werden, zeigt
+der Client einen Fehlerzustand und wechselt nicht automatisch in den lokalen
+Workspace. So landen Änderungen nicht unbemerkt in der falschen Datenquelle.
+
 ## Funktionsumfang
 
 ### Boards und Aufgaben
@@ -213,7 +217,7 @@ Die Anwendung setzt moderne Browser-APIs voraus, insbesondere ES-Module, `struct
 
 Die Servermigration wird parallel zum weiterhin funktionsfähigen Local-first-Client aufgebaut. Der Node.js-HTTP-Server stellt Liveness, Readiness und eine erste lesende Board-API bereit. Der Browser-Client arbeitet bis zur folgenden Integrationsstufe weiterhin mit seinem lokalen Workspace.
 
-> **Sicherheitsgrenze:** Der Servermodus ist ausschließlich für Entwicklung und kontrollierte Testumgebungen vorgesehen. `DEV_USER_ID` ist eine globale Entwicklungsidentität, keine Anmeldung. Vor einem öffentlichen Betrieb sind mindestens eine pro Request verifizierte Identität, eingeschränktes CORS, Rate Limiting und produktionsgeeignete Security-Header erforderlich. Die HTTP-Schicht akzeptiert bereits einen austauschbaren Request-Identity-Resolver; der mitgelieferte Server verwendet bewusst nur den Development-Adapter.
+> **Sicherheitsgrenze:** Der Servermodus ist ausschließlich für Entwicklung und kontrollierte Testumgebungen vorgesehen. `DEV_USER_ID` ist eine globale Entwicklungsidentität, keine Anmeldung. CORS ist standardmäßig geschlossen und kann über `CORS_ORIGIN` für genau einen Browser-Origin geöffnet werden; API-Antworten setzen grundlegende Security-Header. Vor einem öffentlichen Betrieb fehlen weiterhin mindestens eine pro Request verifizierte Identität und Rate Limiting. Die HTTP-Schicht akzeptiert bereits einen austauschbaren Request-Identity-Resolver; der mitgelieferte Server verwendet bewusst nur den Development-Adapter.
 
 ### Lokale Datenbank starten
 
