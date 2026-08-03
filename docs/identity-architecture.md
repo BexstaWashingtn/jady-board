@@ -56,6 +56,19 @@ After migrations have run, an administrator can explicitly link a Clerk user
 to an existing local user. Use the JWT issuer (`iss`) produced by the configured
 Clerk instance and the stable Clerk user ID as `subject`:
 
+```powershell
+npm run db:link-clerk-user -- `
+  --local-user 8acf3017-cf6e-589b-bd47-a1d8ccec16a8 `
+  --issuer https://example.clerk.accounts.dev `
+  --subject user_... `
+  --dry-run
+```
+
+Remove `--dry-run` after reviewing the validation result. The command requires
+an existing, active local user, runs in a transaction, is idempotent for the
+same link and rejects an identity already linked to another user. It never
+creates roles, memberships or users. The equivalent administrative SQL is:
+
 ```sql
 INSERT INTO external_identities (id, user_id, issuer, subject)
 VALUES (

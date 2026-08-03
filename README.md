@@ -299,6 +299,14 @@ verknüpfter Clerk-Benutzer erhält `403 IDENTITY_NOT_LINKED`. Details und ein
 SQL-Beispiel zur kontrollierten Verknüpfung stehen in
 [`docs/identity-architecture.md`](docs/identity-architecture.md).
 
+Eine vorhandene lokale Benutzer-ID kann zunächst ohne Änderung geprüft und
+anschließend explizit verknüpft werden:
+
+```powershell
+npm run db:link-clerk-user -- --local-user <uuid> --issuer <https-clerk-issuer> --subject <user_...> --dry-run
+npm run db:link-clerk-user -- --local-user <uuid> --issuer <https-clerk-issuer> --subject <user_...>
+```
+
 `DEV_USER_ID` ist eine vorübergehende Entwicklungsidentität und muss der UUID eines importierten Benutzers entsprechen. Für kontrollierte Tests kann stattdessen eine JSON-Liste opaker Credentials konfiguriert werden; Tokens benötigen mindestens 32 Zeichen:
 
 ```dotenv
