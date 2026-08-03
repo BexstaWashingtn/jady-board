@@ -217,7 +217,7 @@ Die Anwendung setzt moderne Browser-APIs voraus, insbesondere ES-Module, `struct
 
 Die Servermigration wird parallel zum weiterhin funktionsfähigen Local-first-Client aufgebaut. Der Node.js-HTTP-Server stellt Liveness, Readiness und eine erste lesende Board-API bereit. Der Browser-Client arbeitet bis zur folgenden Integrationsstufe weiterhin mit seinem lokalen Workspace.
 
-> **Sicherheitsgrenze:** Der Servermodus ist ausschließlich für Entwicklung und kontrollierte Testumgebungen vorgesehen. `DEV_USER_ID` ist eine globale Entwicklungsidentität, keine Anmeldung. CORS ist standardmäßig geschlossen und kann über `CORS_ORIGIN` für genau einen Browser-Origin geöffnet werden; API-Antworten setzen grundlegende Security-Header. Vor einem öffentlichen Betrieb fehlen weiterhin mindestens eine pro Request verifizierte Identität und Rate Limiting. Die HTTP-Schicht akzeptiert bereits einen austauschbaren Request-Identity-Resolver; der mitgelieferte Server verwendet bewusst nur den Development-Adapter.
+> **Sicherheitsgrenze:** Der Server unterstützt verifizierte, opake Bearer-Credentials über `API_BEARER_IDENTITIES`. `DEV_USER_ID` bleibt ein ausdrücklich davon getrennter Entwicklungsadapter und darf nicht gleichzeitig konfiguriert werden. CORS ist standardmäßig geschlossen, geschützte Routen sind rate-limitiert und jede Antwort trägt eine Request-ID sowie grundlegende Security-Header. Für große, horizontal skalierte Installationen muss der mitgelieferte In-Memory-Limiter durch einen gemeinsamen Store ersetzt und die Credential-Verwaltung an einen dedizierten Identity Provider angebunden werden.
 
 ### Lokale Datenbank starten
 
@@ -267,7 +267,16 @@ Die API verwendet standardmäßig Port `3000`:
 - `DELETE /api/boards/:boardId/stages/:stageId` löscht eine Stage versioniert und übernimmt vorhandene Tasks transaktional in eine zulässige Ziel-Stage.
 - `PATCH /api/boards/:boardId` aktualisiert Name, Pfad und Beschreibung eines Boards versioniert als Owner.
 
-`DEV_USER_ID` ist eine vorübergehende Entwicklungsidentität und muss der UUID eines importierten Benutzers entsprechen. Sie ersetzt keine spätere Authentifizierung.
+`DEV_USER_ID` ist eine vorübergehende Entwicklungsidentität und muss der UUID eines importierten Benutzers entsprechen. Für verifizierte API-Zugriffe wird stattdessen eine JSON-Liste opaker Credentials konfiguriert; Tokens benötigen mindestens 32 Zeichen:
+
+```dotenv
+API_BEARER_IDENTITIES=[{"userId":"8acf3017-cf6e-589b-bd47-a1d8ccec16a8","token":"replace-with-at-least-32-random-characters"}]
+CORS_ORIGIN=https://board.example.com
+RATE_LIMIT_REQUESTS=120
+RATE_LIMIT_WINDOW_MS=60000
+```
+
+Ein Request authentifiziert sich anschließend mit `Authorization: Bearer <token>`. Health- und Readiness-Endpunkte bleiben vom Rate Limit ausgenommen. Der Limiter arbeitet pro Serverprozess und Client-IP; mehrere Serverinstanzen benötigen einen gemeinsamen Limiter-Adapter.
 
 Der Browser bleibt standardmäßig Local-first. Die lesende API-Anbindung kann für die Migration explizit aktiviert werden:
 
@@ -303,7 +312,7 @@ Das initiale relationale Schema trennt Benutzer, Präferenzen, Boards, Mitgliede
 ## Aktuelle Grenzen
 
 - Der Browser-Client arbeitet standardmäßig weiterhin mit seinem lokalen Workspace. Im optionalen API-Modus werden neue Tasks, Task-Metadaten und Statusänderungen aus dem Task-Dialog bereits gespeichert; alle anderen Änderungen gehen beim Neuladen weiterhin verloren.
-- Es gibt noch keine Anmeldung; die lesende API begrenzt den Zugriff vorläufig über `DEV_USER_ID`.
+- Eine interaktive Browser-Anmeldung und ein externer Identity Provider fehlen noch; für kontrollierte API-Clients stehen opake Bearer-Credentials zur Verfügung.
 - Gleichzeitige Bearbeitung durch mehrere Personen wird nicht unterstützt.
 - Automatische oder zeitgesteuerte Backups sind nicht vorhanden; Exporte müssen manuell ausgelöst werden.
 - Benutzerprofile simulieren Teamrollen nur innerhalb des lokalen Workspace.

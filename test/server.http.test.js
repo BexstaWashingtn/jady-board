@@ -3,6 +3,7 @@ import { afterEach, describe, test } from "node:test";
 import { createServer } from "node:http";
 
 import { createApiHandler } from "../server/src/http/app.js";
+import { createBearerIdentityResolver } from "../server/src/http/request-identity.js";
 
 /** @type {import("node:http").Server[]} */
 const servers = [];
@@ -22,6 +23,25 @@ describe("Server-Health-API", () => {
     assert.equal(response.headers.get("x-content-type-options"), "nosniff");
     assert.equal(response.headers.get("x-frame-options"), "DENY");
     assert.equal(response.headers.get("referrer-policy"), "no-referrer");
+    assert.match(response.headers.get("x-request-id") ?? "", /^[0-9a-f-]{36}$/);
+  });
+
+  test("übernimmt sichere Request-IDs und begrenzt geschützte Endpunkte", async () => {
+    const rateLimiter = { consume: () => ({ allowed: false, limit: 1, remaining: 0, resetAt: Date.now() + 1000 }) };
+    const server = createServer(createApiHandler({
+      database: { query: async () => ({ rows: [] }) }, rateLimiter,
+    }));
+    const baseUrl = await start(server);
+    const health = await fetch(`${baseUrl}/api/health`, { headers: { "X-Request-ID": "request-12345678" } });
+    assert.equal(health.status, 200);
+    assert.equal(health.headers.get("x-request-id"), "request-12345678");
+    const limited = await fetch(`${baseUrl}/api/boards`, { headers: { "X-Request-ID": "request-abcdefgh" } });
+    assert.equal(limited.status, 429);
+    assert.equal(limited.headers.get("x-ratelimit-limit"), "1");
+    assert.equal(limited.headers.get("retry-after"), "1");
+    assert.deepEqual(await limited.json(), {
+      error: { code: "RATE_LIMITED", message: "Too many requests." }, requestId: "request-abcdefgh",
+    });
   });
 
   test("erlaubt nur den explizit konfigurierten Browser-Origin", async () => {
@@ -88,6 +108,21 @@ describe("Server-Health-API", () => {
 describe("Board-Lese-API", () => {
   const userId = "8acf3017-cf6e-589b-bd47-a1d8ccec16a8";
   const boardId = "46ed3b71-86cb-5eb7-a01e-dd5885e41c6a";
+
+  test("verlangt im Bearer-Modus ein verifiziertes Zugriffstoken", async () => {
+    const token = "abcdefghijklmnopqrstuvwxyz-123456";
+    const boardService = { async listBoards() { return []; }, async getBoard() { return null; } };
+    const server = createServer(createApiHandler({
+      database: { query: async () => ({ rows: [] }) }, boardService,
+      resolveIdentity: createBearerIdentityResolver([{ userId, token }]), identityRequired: true,
+    }));
+    const baseUrl = await start(server);
+    assert.equal((await fetch(`${baseUrl}/api/boards`)).status, 401);
+    assert.equal((await fetch(`${baseUrl}/api/boards`, { headers: { Authorization: "Bearer wrong" } })).status, 401);
+    const authenticated = await fetch(`${baseUrl}/api/boards`, { headers: { Authorization: `Bearer ${token}` } });
+    assert.equal(authenticated.status, 200);
+    assert.equal((await authenticated.json()).currentUserId, userId);
+  });
 
   test("ermittelt die Identitaet pro Request ueber einen Resolver", async () => {
     const boardService = {

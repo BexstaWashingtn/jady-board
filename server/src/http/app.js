@@ -1,5 +1,6 @@
 import { isUuid, readJson, sendJson as writeJson, sendNoContent } from "./http.js";
 import { createDevelopmentIdentityResolver } from "./request-identity.js";
+import { randomUUID } from "node:crypto";
 
 const BASE_HEADERS = {
   "Content-Type": "application/json; charset=utf-8",
@@ -17,18 +18,25 @@ const BASE_HEADERS = {
  *   currentUserId?: string|null,
  *   resolveIdentity?: import("./request-identity.js").RequestIdentityResolver
  *   corsOrigin?: string|null
+ *   rateLimiter?: {consume: (key: string) => {allowed: boolean, limit: number, remaining: number, resetAt: number}}
+ *   identityRequired?: boolean
  * }} dependencies
  * @returns {import("node:http").RequestListener}
  */
-export function createApiHandler({ database, boardService, currentUserId = null, resolveIdentity = createDevelopmentIdentityResolver(currentUserId), corsOrigin = null }) {
+export function createApiHandler({ database, boardService, currentUserId = null, resolveIdentity = createDevelopmentIdentityResolver(currentUserId), corsOrigin = null, rateLimiter, identityRequired = false }) {
   return async function apiHandler(request, response) {
     const method = request.method ?? "GET";
     const url = new URL(request.url ?? "/", "http://localhost");
     const requestOrigin = request.headers.origin ?? null;
+    const incomingRequestId = request.headers["x-request-id"];
+    const requestId = typeof incomingRequestId === "string" && /^[A-Za-z0-9._-]{8,128}$/.test(incomingRequestId)
+      ? incomingRequestId
+      : randomUUID();
     const corsAllowed = requestOrigin === null || requestOrigin === corsOrigin;
+    /** @type {Record<string, string>} */
     const responseHeaders = corsAllowed && requestOrigin
-      ? { ...BASE_HEADERS, "Access-Control-Allow-Origin": requestOrigin, "Vary": "Origin" }
-      : BASE_HEADERS;
+      ? { ...BASE_HEADERS, "X-Request-ID": requestId, "Access-Control-Allow-Origin": requestOrigin, "Access-Control-Expose-Headers": "X-Request-ID, X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset", "Vary": "Origin" }
+      : { ...BASE_HEADERS, "X-Request-ID": requestId };
     /** @param {import("node:http").ServerResponse} target @param {number} status @param {unknown} body */
     const sendJson = (target, status, body) => writeJson(target, status, body, responseHeaders);
 
@@ -41,7 +49,7 @@ export function createApiHandler({ database, boardService, currentUserId = null,
       response.writeHead(204, {
         ...responseHeaders,
         "Access-Control-Allow-Methods": "GET, POST, PATCH, DELETE, OPTIONS",
-        "Access-Control-Allow-Headers": "Accept, Content-Type",
+        "Access-Control-Allow-Headers": "Accept, Authorization, Content-Type, X-Request-ID",
       });
       response.end();
       return;
@@ -65,6 +73,19 @@ export function createApiHandler({ database, boardService, currentUserId = null,
       return;
     }
 
+    if (rateLimiter) {
+      const client = request.socket.remoteAddress ?? "unknown";
+      const result = rateLimiter.consume(client);
+      responseHeaders["X-RateLimit-Limit"] = String(result.limit);
+      responseHeaders["X-RateLimit-Remaining"] = String(result.remaining);
+      responseHeaders["X-RateLimit-Reset"] = String(Math.ceil(result.resetAt / 1000));
+      if (!result.allowed) {
+        responseHeaders["Retry-After"] = String(Math.max(1, Math.ceil((result.resetAt - Date.now()) / 1000)));
+        sendJson(response, 429, { error: { code: "RATE_LIMITED", message: "Too many requests." }, requestId });
+        return;
+      }
+    }
+
     let requestUserId;
     try {
       requestUserId = await resolveIdentity(request);
@@ -73,6 +94,10 @@ export function createApiHandler({ database, boardService, currentUserId = null,
       return;
     }
     if (requestUserId && !isUuid(requestUserId)) {
+      sendJson(response, 401, identityRejected());
+      return;
+    }
+    if (identityRequired && !requestUserId) {
       sendJson(response, 401, identityRejected());
       return;
     }

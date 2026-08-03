@@ -4,7 +4,8 @@ import { pathToFileURL } from "node:url";
 import { loadConfig } from "./config.js";
 import { createDatabase } from "./db/database.js";
 import { createApiHandler } from "./http/app.js";
-import { createDevelopmentIdentityResolver } from "./http/request-identity.js";
+import { createBearerIdentityResolver, createDevelopmentIdentityResolver } from "./http/request-identity.js";
+import { createRateLimiter } from "./http/rate-limiter.js";
 import { createBoardRepository } from "./modules/boards/board.repository.js";
 import { createBoardService } from "./modules/boards/board.service.js";
 
@@ -18,8 +19,12 @@ export function createJaDyServer(config) {
   const server = createServer(createApiHandler({
     database,
     boardService,
-    resolveIdentity: createDevelopmentIdentityResolver(config.devUserId),
+    resolveIdentity: config.bearerIdentities.length
+      ? createBearerIdentityResolver(config.bearerIdentities)
+      : createDevelopmentIdentityResolver(config.devUserId),
     corsOrigin: config.corsOrigin,
+    rateLimiter: createRateLimiter({ limit: config.rateLimit, windowMs: config.rateLimitWindowMs }),
+    identityRequired: config.bearerIdentities.length > 0,
   }));
 
   async function close() {

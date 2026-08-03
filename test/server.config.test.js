@@ -10,15 +10,20 @@ describe("Server-Konfiguration", () => {
       DATABASE_SSL: "true",
       SERVER_HOST: "0.0.0.0",
       SERVER_PORT: "8080",
-      DEV_USER_ID: "8acf3017-cf6e-589b-bd47-a1d8ccec16a8",
       CORS_ORIGIN: "https://board.example.com",
+      API_BEARER_IDENTITIES: '[{"userId":"3f6fd6ee-952c-5f00-9ef8-3ce172499a19","token":"abcdefghijklmnopqrstuvwxyz-123456"}]',
+      RATE_LIMIT_REQUESTS: "60",
+      RATE_LIMIT_WINDOW_MS: "30000",
     }), {
       databaseUrl: "postgresql://localhost/jady",
       databaseSsl: true,
       host: "0.0.0.0",
       port: 8080,
-      devUserId: "8acf3017-cf6e-589b-bd47-a1d8ccec16a8",
+      devUserId: null,
       corsOrigin: "https://board.example.com",
+      bearerIdentities: [{ userId: "3f6fd6ee-952c-5f00-9ef8-3ce172499a19", token: "abcdefghijklmnopqrstuvwxyz-123456" }],
+      rateLimit: 60,
+      rateLimitWindowMs: 30000,
     });
   });
 
@@ -29,6 +34,9 @@ describe("Server-Konfiguration", () => {
     assert.equal(config.databaseSsl, false);
     assert.equal(config.devUserId, null);
     assert.equal(config.corsOrigin, null);
+    assert.deepEqual(config.bearerIdentities, []);
+    assert.equal(config.rateLimit, 120);
+    assert.equal(config.rateLimitWindowMs, 60000);
   });
 
   test("weist eine fehlende Datenbank und ungültige Ports zurück", () => {
@@ -49,5 +57,13 @@ describe("Server-Konfiguration", () => {
       () => loadConfig({ DATABASE_URL: "postgresql://localhost/jady", CORS_ORIGIN: "board.example.com" }),
       /CORS_ORIGIN/,
     );
+    assert.throws(() => loadConfig({ DATABASE_URL: "postgresql://localhost/jady", RATE_LIMIT_REQUESTS: "0" }), /RATE_LIMIT_REQUESTS/);
+    assert.throws(() => loadConfig({ DATABASE_URL: "postgresql://localhost/jady", API_BEARER_IDENTITIES: "not-json" }), /API_BEARER_IDENTITIES/);
+    assert.throws(() => loadConfig({ DATABASE_URL: "postgresql://localhost/jady", API_BEARER_IDENTITIES: '[{"userId":"bad","token":"short"}]' }), /userId/);
+    assert.throws(() => loadConfig({
+      DATABASE_URL: "postgresql://localhost/jady",
+      DEV_USER_ID: "8acf3017-cf6e-589b-bd47-a1d8ccec16a8",
+      API_BEARER_IDENTITIES: '[{"userId":"3f6fd6ee-952c-5f00-9ef8-3ce172499a19","token":"abcdefghijklmnopqrstuvwxyz-123456"}]',
+    }), /cannot be used together/);
   });
 });
