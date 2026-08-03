@@ -68,6 +68,12 @@ Once decided, a migration can introduce an external identity relation keyed by
 `(issuer, subject)` and referencing `users.id`. Existing board tables and
 permission checks do not need to change.
 
+The tenancy, invitation and account-linking decisions are now defined in
+[`adr/0001-team-tenancy-and-account-linking.md`](adr/0001-team-tenancy-and-account-linking.md).
+
+The tenancy, invitation and account-linking decisions are now defined in
+[`adr/0001-team-tenancy-and-account-linking.md`](adr/0001-team-tenancy-and-account-linking.md).
+
 ## Security invariants
 
 - Authentication failure yields no local user identity.

@@ -225,6 +225,9 @@ Benutzer-ID. Rollen, Board-Mitgliedschaften und Berechtigungen bleiben dadurch
 providerunabhängig. Der vollständige Integrationsvertrag und die bewusst
 vertagten Produktentscheidungen stehen in
 [`docs/identity-architecture.md`](docs/identity-architecture.md).
+Das verbindliche Zielmodell für Teams, getrennte Team- und Boardrollen,
+Einladungen und Account-Verknüpfungen beschreibt
+[`ADR 0001`](docs/adr/0001-team-tenancy-and-account-linking.md).
 
 ### Lokale Datenbank starten
 
