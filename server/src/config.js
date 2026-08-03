@@ -11,6 +11,8 @@ const DEFAULT_PORT = 3000;
  * @property {{userId: string, token: string}[]} bearerIdentities
  * @property {number} rateLimit
  * @property {number} rateLimitWindowMs
+ * @property {"clerk"|"controlled-bearer"|"development"} authMode
+ * @property {{publishableKey: string, secretKey: string, authorizedParties: string[]}|null} clerk
  */
 
 /**
@@ -35,9 +37,8 @@ export function loadConfig(environment = process.env) {
     throw new Error("DEV_USER_ID must be a UUID.");
   }
   const bearerIdentities = parseBearerIdentities(environment.API_BEARER_IDENTITIES);
-  if (devUserId && bearerIdentities.length) {
-    throw new Error("DEV_USER_ID and API_BEARER_IDENTITIES cannot be used together.");
-  }
+  const clerk = parseClerkConfig(environment);
+  const authMode = parseAuthMode(environment.AUTH_MODE, { clerk, bearerIdentities, devUserId });
   const rateLimit = positiveInteger(environment.RATE_LIMIT_REQUESTS ?? "120", "RATE_LIMIT_REQUESTS");
   const rateLimitWindowMs = positiveInteger(environment.RATE_LIMIT_WINDOW_MS ?? "60000", "RATE_LIMIT_WINDOW_MS");
 
@@ -51,7 +52,46 @@ export function loadConfig(environment = process.env) {
     bearerIdentities,
     rateLimit,
     rateLimitWindowMs,
+    authMode,
+    clerk,
   };
+}
+
+/** @param {string|undefined} value @param {{clerk: ServerConfig["clerk"], bearerIdentities: ServerConfig["bearerIdentities"], devUserId: string|null}} available */
+function parseAuthMode(value, available) {
+  const configured = value?.trim();
+  const inferred = available.clerk ? "clerk" : available.bearerIdentities.length ? "controlled-bearer" : "development";
+  const mode = configured || inferred;
+  if (!["clerk", "controlled-bearer", "development"].includes(mode)) throw new Error("AUTH_MODE must be clerk, controlled-bearer, or development.");
+  const configuredModes = Number(Boolean(available.clerk)) + Number(available.bearerIdentities.length > 0) + Number(Boolean(available.devUserId));
+  if (configuredModes > 1) throw new Error("Clerk, API_BEARER_IDENTITIES, and DEV_USER_ID cannot be configured together.");
+  if (available.clerk && mode !== "clerk") throw new Error("Clerk credentials require AUTH_MODE=clerk.");
+  if (available.bearerIdentities.length && mode !== "controlled-bearer") throw new Error("API_BEARER_IDENTITIES requires AUTH_MODE=controlled-bearer.");
+  if (available.devUserId && mode !== "development") throw new Error("DEV_USER_ID requires AUTH_MODE=development.");
+  if (mode === "clerk" && !available.clerk) throw new Error("Clerk authentication configuration is incomplete.");
+  if (mode === "controlled-bearer" && !available.bearerIdentities.length) throw new Error("API_BEARER_IDENTITIES is required for controlled-bearer mode.");
+  return /** @type {ServerConfig["authMode"]} */ (mode);
+}
+
+/** @param {NodeJS.ProcessEnv} environment */
+function parseClerkConfig(environment) {
+  const publishableKey = environment.CLERK_PUBLISHABLE_KEY?.trim() ?? "";
+  const secretKey = environment.CLERK_SECRET_KEY?.trim() ?? "";
+  const parties = environment.CLERK_AUTHORIZED_PARTIES?.split(",").map((value) => value.trim()).filter(Boolean) ?? [];
+  if (!publishableKey && !secretKey && !parties.length) return null;
+  if (!/^pk_(test|live)_/.test(publishableKey)) throw new Error("CLERK_PUBLISHABLE_KEY is invalid.");
+  if (!/^sk_(test|live)_/.test(secretKey)) throw new Error("CLERK_SECRET_KEY is invalid.");
+  if (!parties.length) throw new Error("CLERK_AUTHORIZED_PARTIES is required.");
+  const authorizedParties = parties.map((origin) => parseRequiredOrigin(origin, "CLERK_AUTHORIZED_PARTIES"));
+  return { publishableKey, secretKey, authorizedParties: [...new Set(authorizedParties)] };
+}
+
+/** @param {string} origin @param {string} name */
+function parseRequiredOrigin(origin, name) {
+  let parsed;
+  try { parsed = new URL(origin); } catch { throw new Error(`${name} must contain valid http(s) origins.`); }
+  if (!["http:", "https:"].includes(parsed.protocol) || parsed.origin !== origin) throw new Error(`${name} must contain valid http(s) origins.`);
+  return parsed.origin;
 }
 
 /** @param {string|undefined} value */

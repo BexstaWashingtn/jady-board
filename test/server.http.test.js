@@ -3,7 +3,7 @@ import { afterEach, describe, test } from "node:test";
 import { createServer } from "node:http";
 
 import { createApiHandler } from "../server/src/http/app.js";
-import { createBearerIdentityResolver } from "../server/src/http/request-identity.js";
+import { createBearerIdentityResolver, IdentityNotLinkedError } from "../server/src/http/request-identity.js";
 
 /** @type {import("node:http").Server[]} */
 const servers = [];
@@ -13,6 +13,36 @@ afterEach(async () => {
 });
 
 describe("Server-Health-API", () => {
+  test("veröffentlicht ausschließlich die browserseitige Auth-Konfiguration", async () => {
+    const server = createServer(createApiHandler({
+      database: { query: async () => ({ rows: [] }) },
+      authPublicConfig: { mode: "clerk", publishableKey: "pk_test_public" },
+    }));
+    const baseUrl = await start(server);
+    const response = await fetch(`${baseUrl}/api/auth/config`);
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), { mode: "clerk", publishableKey: "pk_test_public" });
+  });
+
+  test("unterscheidet eine nicht verknüpfte Clerk-Identität von fehlender Anmeldung", async () => {
+    const server = createServer(createApiHandler({
+      database: { query: async () => ({ rows: [] }) },
+      identityRequired: true,
+      resolveIdentity: async () => { throw new IdentityNotLinkedError(); },
+    }));
+    const baseUrl = await start(server);
+    const response = await fetch(`${baseUrl}/api/boards`);
+
+    assert.equal(response.status, 403);
+    assert.deepEqual(await response.json(), {
+      error: {
+        code: "IDENTITY_NOT_LINKED",
+        message: "The authenticated identity is not linked to a JaDy Board user.",
+      },
+    });
+  });
+
   test("meldet den laufenden Prozess als gesund", async () => {
     const baseUrl = await listen({ query: async () => ({ rows: [] }) });
     const response = await fetch(`${baseUrl}/api/health`);

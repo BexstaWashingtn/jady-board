@@ -9,6 +9,13 @@ import { createHash, timingSafeEqual } from "node:crypto";
 
 export const CONTROLLED_BEARER_ISSUER = "urn:jady-board:controlled-bearer";
 
+export class IdentityNotLinkedError extends Error {
+  constructor() {
+    super("The authenticated identity is not linked to a local user.");
+    this.name = "IdentityNotLinkedError";
+  }
+}
+
 /**
  * Explicit development-only identity adapter. Production deployments must
  * replace this with a resolver backed by a verified session or access token.
@@ -33,7 +40,9 @@ export function createRequestIdentityResolver({ resolvePrincipal, resolveLocalUs
     const principal = await resolvePrincipal(request);
     if (!principal) return null;
     if (!principal.issuer.trim() || !principal.subject.trim()) throw new Error("Authenticated principal is invalid.");
-    return resolveLocalUser(principal);
+    const userId = await resolveLocalUser(principal);
+    if (!userId) throw new IdentityNotLinkedError();
+    return userId;
   };
 }
 

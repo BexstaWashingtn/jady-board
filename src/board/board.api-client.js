@@ -12,6 +12,17 @@ export function readApiDataSource(location) {
   return (configured || location.origin).replace(/\/$/, "");
 }
 
+/** @param {string} baseUrl @param {typeof fetch} [request] */
+export async function loadApiAuthConfig(baseUrl, request = fetch) {
+  const response = await request(`${baseUrl}/api/auth/config`, { headers: { Accept: "application/json" } });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok || !["clerk", "controlled-bearer", "development"].includes(body.mode)) {
+    throw new Error(`Board API: authentication configuration unavailable (${response.status}).`);
+  }
+  if (body.mode === "clerk" && typeof body.publishableKey !== "string") throw new Error("Board API: Clerk configuration is invalid.");
+  return /** @type {{mode: "clerk"|"controlled-bearer"|"development", publishableKey?: string}} */ (body);
+}
+
 /**
  * Loads every accessible board and maps the public API contract to the
  * existing client workspace. Changes remain volatile in this migration step.

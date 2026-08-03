@@ -1,5 +1,5 @@
 import { isUuid, readJson, sendJson as writeJson, sendNoContent } from "./http.js";
-import { createDevelopmentIdentityResolver } from "./request-identity.js";
+import { createDevelopmentIdentityResolver, IdentityNotLinkedError } from "./request-identity.js";
 import { randomUUID } from "node:crypto";
 
 const BASE_HEADERS = {
@@ -20,10 +20,11 @@ const BASE_HEADERS = {
  *   corsOrigin?: string|null
  *   rateLimiter?: {consume: (key: string) => {allowed: boolean, limit: number, remaining: number, resetAt: number}}
  *   identityRequired?: boolean
+ *   authPublicConfig?: {mode: string, publishableKey?: string}
  * }} dependencies
  * @returns {import("node:http").RequestListener}
  */
-export function createApiHandler({ database, boardService, currentUserId = null, resolveIdentity = createDevelopmentIdentityResolver(currentUserId), corsOrigin = null, rateLimiter, identityRequired = false }) {
+export function createApiHandler({ database, boardService, currentUserId = null, resolveIdentity = createDevelopmentIdentityResolver(currentUserId), corsOrigin = null, rateLimiter, identityRequired = false, authPublicConfig = { mode: "development" } }) {
   return async function apiHandler(request, response) {
     const method = request.method ?? "GET";
     const url = new URL(request.url ?? "/", "http://localhost");
@@ -73,6 +74,11 @@ export function createApiHandler({ database, boardService, currentUserId = null,
       return;
     }
 
+    if (method === "GET" && url.pathname === "/api/auth/config") {
+      sendJson(response, 200, authPublicConfig);
+      return;
+    }
+
     if (rateLimiter) {
       const client = request.socket.remoteAddress ?? "unknown";
       const result = rateLimiter.consume(client);
@@ -89,7 +95,11 @@ export function createApiHandler({ database, boardService, currentUserId = null,
     let requestUserId;
     try {
       requestUserId = await resolveIdentity(request);
-    } catch {
+    } catch (error) {
+      if (error instanceof IdentityNotLinkedError) {
+        sendJson(response, 403, { error: { code: "IDENTITY_NOT_LINKED", message: "The authenticated identity is not linked to a JaDy Board user." } });
+        return;
+      }
       sendJson(response, 401, identityRejected());
       return;
     }

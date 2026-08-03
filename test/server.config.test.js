@@ -24,6 +24,8 @@ describe("Server-Konfiguration", () => {
       bearerIdentities: [{ userId: "3f6fd6ee-952c-5f00-9ef8-3ce172499a19", token: "abcdefghijklmnopqrstuvwxyz-123456" }],
       rateLimit: 60,
       rateLimitWindowMs: 30000,
+      authMode: "controlled-bearer",
+      clerk: null,
     });
   });
 
@@ -37,6 +39,8 @@ describe("Server-Konfiguration", () => {
     assert.deepEqual(config.bearerIdentities, []);
     assert.equal(config.rateLimit, 120);
     assert.equal(config.rateLimitWindowMs, 60000);
+    assert.equal(config.authMode, "development");
+    assert.equal(config.clerk, null);
   });
 
   test("weist eine fehlende Datenbank und ungültige Ports zurück", () => {
@@ -64,6 +68,21 @@ describe("Server-Konfiguration", () => {
       DATABASE_URL: "postgresql://localhost/jady",
       DEV_USER_ID: "8acf3017-cf6e-589b-bd47-a1d8ccec16a8",
       API_BEARER_IDENTITIES: '[{"userId":"3f6fd6ee-952c-5f00-9ef8-3ce172499a19","token":"abcdefghijklmnopqrstuvwxyz-123456"}]',
-    }), /cannot be used together/);
+    }), /cannot be configured together/);
+  });
+
+  test("liest eine vollständige Clerk-Konfiguration", () => {
+    const config = loadConfig({
+      DATABASE_URL: "postgresql://localhost/jady", AUTH_MODE: "clerk",
+      CLERK_PUBLISHABLE_KEY: "pk_test_Y2xlcmsuZXhhbXBsZS5jb20k",
+      CLERK_SECRET_KEY: "sk_test_secret",
+      CLERK_AUTHORIZED_PARTIES: "https://board.example.com,http://127.0.0.1:4173",
+    });
+    assert.equal(config.authMode, "clerk");
+    assert.deepEqual(config.clerk, {
+      publishableKey: "pk_test_Y2xlcmsuZXhhbXBsZS5jb20k", secretKey: "sk_test_secret",
+      authorizedParties: ["https://board.example.com", "http://127.0.0.1:4173"],
+    });
+    assert.throws(() => loadConfig({ DATABASE_URL: "postgresql://localhost/jady", AUTH_MODE: "clerk" }), /incomplete/);
   });
 });

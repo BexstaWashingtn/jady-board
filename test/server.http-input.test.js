@@ -3,7 +3,7 @@ import { Readable } from "node:stream";
 import { describe, test } from "node:test";
 
 import { HttpInputError, isUuid, readJson } from "../server/src/http/http.js";
-import { CONTROLLED_BEARER_ISSUER, createBearerIdentityResolver, createBearerPrincipalResolver, createDevelopmentIdentityResolver, createRequestIdentityResolver } from "../server/src/http/request-identity.js";
+import { CONTROLLED_BEARER_ISSUER, createBearerIdentityResolver, createBearerPrincipalResolver, createDevelopmentIdentityResolver, createRequestIdentityResolver, IdentityNotLinkedError } from "../server/src/http/request-identity.js";
 import { createRateLimiter } from "../server/src/http/rate-limiter.js";
 
 describe("HTTP-Eingabevertraege", () => {
@@ -41,7 +41,7 @@ describe("HTTP-Eingabevertraege", () => {
       resolvePrincipal: () => ({ issuer: "https://identity.example", subject: "unknown" }),
       resolveLocalUser: () => null,
     });
-    assert.equal(await unknown(request), null);
+    await assert.rejects(unknown(request), IdentityNotLinkedError);
   });
 
   test("legt auch den kontrollierten Tokenzugang auf die Principal-Grenze", async () => {

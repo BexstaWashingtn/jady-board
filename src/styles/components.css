@@ -21,6 +21,8 @@
 .startup-error__actions { display: flex; flex-wrap: wrap; gap: var(--space-3); margin-top: var(--space-5); }
 .startup-login { display: grid; gap: var(--space-3); margin-top: var(--space-5); }
 .startup-login input { width: 100%; }
+.startup-error__card--clerk { width: min(100%, 34rem); }
+.clerk-sign-in-host { display: grid; justify-content: center; min-height: 12rem; margin: var(--space-5) 0; }
 
 .board-app {
   min-height: 100vh;

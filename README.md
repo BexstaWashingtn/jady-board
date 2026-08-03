@@ -277,9 +277,32 @@ Die API verwendet standardmäßig Port `3000`:
 - `DELETE /api/boards/:boardId/stages/:stageId` löscht eine Stage versioniert und übernimmt vorhandene Tasks transaktional in eine zulässige Ziel-Stage.
 - `PATCH /api/boards/:boardId` aktualisiert Name, Pfad und Beschreibung eines Boards versioniert als Owner.
 
-`DEV_USER_ID` ist eine vorübergehende Entwicklungsidentität und muss der UUID eines importierten Benutzers entsprechen. Für verifizierte API-Zugriffe wird stattdessen eine JSON-Liste opaker Credentials konfiguriert; Tokens benötigen mindestens 32 Zeichen:
+Für den regulären API-Modus authentifiziert Clerk den Benutzer vollständig. Das
+JaDy Board speichert keine Passwörter und übernimmt keine Clerk-Rollen. Nach
+`npm run db:migrate` wird eine Clerk-Identität explizit über `(issuer, subject)`
+in `external_identities` mit einem vorhandenen lokalen `users.id` verknüpft;
+Boards, Rollen, Mitgliedschaften und alle Berechtigungsentscheidungen bleiben
+in PostgreSQL.
 
 ```dotenv
+AUTH_MODE=clerk
+CLERK_PUBLISHABLE_KEY=pk_test_...
+CLERK_SECRET_KEY=sk_test_...
+CLERK_AUTHORIZED_PARTIES=http://127.0.0.1:4173
+CORS_ORIGIN=http://127.0.0.1:4173
+```
+
+Der Browser bezieht die öffentliche Auth-Konfiguration über
+`GET /api/auth/config`, rendert die Clerk-Anmeldung und sendet pro API-Request
+ein aktuelles Clerk-Session-Token. Ein gültiger, aber noch nicht lokal
+verknüpfter Clerk-Benutzer erhält `403 IDENTITY_NOT_LINKED`. Details und ein
+SQL-Beispiel zur kontrollierten Verknüpfung stehen in
+[`docs/identity-architecture.md`](docs/identity-architecture.md).
+
+`DEV_USER_ID` ist eine vorübergehende Entwicklungsidentität und muss der UUID eines importierten Benutzers entsprechen. Für kontrollierte Tests kann stattdessen eine JSON-Liste opaker Credentials konfiguriert werden; Tokens benötigen mindestens 32 Zeichen:
+
+```dotenv
+AUTH_MODE=controlled-bearer
 API_BEARER_IDENTITIES=[{"userId":"8acf3017-cf6e-589b-bd47-a1d8ccec16a8","token":"replace-with-at-least-32-random-characters"}]
 CORS_ORIGIN=https://board.example.com
 RATE_LIMIT_REQUESTS=120

@@ -1,9 +1,22 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 
-import { assignApiTask, createApiStage, createApiTask, deleteApiStage, deleteApiTask, loadApiWorkspace, moveApiStage, moveApiTask, readApiDataSource, syncApiTaskTodos, updateApiBoard, updateApiStage, updateApiTask } from "../src/board/board.api-client.js";
+import { assignApiTask, createApiStage, createApiTask, deleteApiStage, deleteApiTask, loadApiAuthConfig, loadApiWorkspace, moveApiStage, moveApiTask, readApiDataSource, syncApiTaskTodos, updateApiBoard, updateApiStage, updateApiTask } from "../src/board/board.api-client.js";
 
 describe("Board-API-Client", () => {
+  test("lädt die öffentliche Clerk-Konfiguration ohne Sitzung", async () => {
+    const config = await loadApiAuthConfig("http://api", async (url) => {
+      assert.equal(url, "http://api/api/auth/config");
+      return response({ mode: "clerk", publishableKey: "pk_test_example" });
+    });
+
+    assert.deepEqual(config, { mode: "clerk", publishableKey: "pk_test_example" });
+    await assert.rejects(
+      loadApiAuthConfig("http://api", async () => response({ mode: "clerk" })),
+      /Clerk configuration is invalid/,
+    );
+  });
+
   test("aktiviert die API ausschließlich per URL-Opt-in", () => {
     assert.equal(readApiDataSource({ search: "", origin: "http://localhost:4173" }), null);
     assert.equal(readApiDataSource({ search: "?data-source=api", origin: "http://localhost:4173" }), "http://localhost:4173");

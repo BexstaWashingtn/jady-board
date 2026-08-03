@@ -30,14 +30,14 @@ export function clearApiToken(storage) {
 }
 
 /**
- * @param {{token: () => string|null, request?: typeof fetch, onUnauthorized?: () => void, requestId?: () => string}} options
+ * @param {{token: () => string|null|Promise<string|null>, request?: typeof fetch, onUnauthorized?: () => void, requestId?: () => string}} options
  * @returns {typeof fetch}
  */
 export function createAuthenticatedRequest({ token, request = fetch, onUnauthorized = () => {}, requestId = defaultRequestId }) {
   return async (input, init = {}) => {
     const headers = new Headers(init.headers);
     headers.set("X-Request-ID", requestId());
-    const credential = token();
+    const credential = await token();
     if (credential) headers.set("Authorization", `Bearer ${credential}`);
     const response = await request(input, { ...init, headers });
     if (response.status === 401) {

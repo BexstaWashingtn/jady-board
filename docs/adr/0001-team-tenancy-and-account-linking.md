@@ -2,22 +2,22 @@
 
 - Status: Accepted
 - Date: 2026-08-03
-- Scope: Future PostgreSQL-backed multi-user mode
+- Scope: PostgreSQL-backed multi-user mode
 
 ## Context
 
 JaDy Board is evolving from a local-first application into a publicly usable
-team product. Authentication will eventually be delegated to an external OIDC
-identity provider, while application users, roles, memberships and permissions
-remain owned by JaDy Board in PostgreSQL.
+team product. Authentication is delegated to Clerk, while application users,
+roles, memberships and permissions remain owned by JaDy Board in PostgreSQL.
 
 The current schema attaches every board to a user through `boards.owner_id` and
 stores board-level roles in `board_members`. That is sufficient for the current
 development API, but it does not define tenant ownership, invitations,
 multi-provider accounts or lifecycle behavior for public teams.
 
-This ADR fixes the product and domain boundaries needed before choosing an OIDC
-provider. It does not select a provider or add database tables.
+This ADR fixes the product and domain boundaries around the selected provider.
+The external identity relation is implemented independently of the remaining
+team and invitation tables.
 
 ## Decisions
 
@@ -210,8 +210,8 @@ The migration is split into independently deployable phases:
 4. Backfill `boards.team_id`, validate every board owner belongs to its team and
    then make the column non-null.
 5. Add invitation tables and APIs without changing existing board permissions.
-6. Add external identities only after account-linking and provider onboarding
-   behavior has been finalized.
+6. Add external identities for explicit administrative Clerk links; invitation
+   acceptance and self-service account linking remain later workflows.
 7. Consider removing `boards.owner_id` only after all reads and writes derive
    ownership canonically from `board_members`. Until then it remains a
    compatibility invariant and must agree with the single owner membership.
@@ -252,7 +252,6 @@ Costs and tradeoffs:
 
 ## Deferred decisions
 
-- concrete OIDC provider and authorization flow;
 - open registration or personal teams;
 - invitation delivery provider and retry behavior;
 - enterprise domain verification or SSO enforcement;
