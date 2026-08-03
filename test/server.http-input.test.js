@@ -3,7 +3,7 @@ import { Readable } from "node:stream";
 import { describe, test } from "node:test";
 
 import { HttpInputError, isUuid, readJson } from "../server/src/http/http.js";
-import { createBearerIdentityResolver, createDevelopmentIdentityResolver } from "../server/src/http/request-identity.js";
+import { CONTROLLED_BEARER_ISSUER, createBearerIdentityResolver, createBearerPrincipalResolver, createDevelopmentIdentityResolver, createRequestIdentityResolver } from "../server/src/http/request-identity.js";
 import { createRateLimiter } from "../server/src/http/rate-limiter.js";
 
 describe("HTTP-Eingabevertraege", () => {
@@ -25,6 +25,31 @@ describe("HTTP-Eingabevertraege", () => {
     assert.equal(await resolve(/** @type {never} */ (request("Bearer wrong-token"))), null);
     assert.equal(await resolve(/** @type {never} */ (request("Basic abc"))), null);
     assert.equal(await resolve(/** @type {never} */ (request(null))), null);
+  });
+
+  test("trennt externe Principals von lokalen PostgreSQL-Benutzern", async () => {
+    const request = /** @type {never} */ ({ headers: {} });
+    let mappedPrincipal;
+    const resolve = createRequestIdentityResolver({
+      resolvePrincipal: async () => ({ issuer: "https://identity.example", subject: "external-123" }),
+      resolveLocalUser: async (principal) => { mappedPrincipal = principal; return "8acf3017-cf6e-589b-bd47-a1d8ccec16a8"; },
+    });
+    assert.equal(await resolve(request), "8acf3017-cf6e-589b-bd47-a1d8ccec16a8");
+    assert.deepEqual(mappedPrincipal, { issuer: "https://identity.example", subject: "external-123" });
+
+    const unknown = createRequestIdentityResolver({
+      resolvePrincipal: () => ({ issuer: "https://identity.example", subject: "unknown" }),
+      resolveLocalUser: () => null,
+    });
+    assert.equal(await unknown(request), null);
+  });
+
+  test("legt auch den kontrollierten Tokenzugang auf die Principal-Grenze", async () => {
+    const userId = "8acf3017-cf6e-589b-bd47-a1d8ccec16a8";
+    const token = "abcdefghijklmnopqrstuvwxyz-123456";
+    const resolve = createBearerPrincipalResolver([{ userId, token }]);
+    const principal = await resolve(/** @type {never} */ ({ headers: { authorization: `Bearer ${token}` } }));
+    assert.deepEqual(principal, { issuer: CONTROLLED_BEARER_ISSUER, subject: userId });
   });
 
   test("begrenzt Requests in einem deterministischen Zeitfenster", () => {

@@ -219,6 +219,13 @@ Die Servermigration wird parallel zum weiterhin funktionsfähigen Local-first-Cl
 
 > **Sicherheitsgrenze:** Der Server unterstützt verifizierte, opake Bearer-Credentials über `API_BEARER_IDENTITIES`. `DEV_USER_ID` bleibt ein ausdrücklich davon getrennter Entwicklungsadapter und darf nicht gleichzeitig konfiguriert werden. CORS ist standardmäßig geschlossen, geschützte Routen sind rate-limitiert und jede Antwort trägt eine Request-ID sowie grundlegende Security-Header. Für große, horizontal skalierte Installationen muss der mitgelieferte In-Memory-Limiter durch einen gemeinsamen Store ersetzt und die Credential-Verwaltung an einen dedizierten Identity Provider angebunden werden.
 
+Die Identity-Schicht trennt bereits die Verifikation eines externen Principals
+(`issuer` und `subject`) von dessen Zuordnung zu einer lokalen PostgreSQL-
+Benutzer-ID. Rollen, Board-Mitgliedschaften und Berechtigungen bleiben dadurch
+providerunabhängig. Der vollständige Integrationsvertrag und die bewusst
+vertagten Produktentscheidungen stehen in
+[`docs/identity-architecture.md`](docs/identity-architecture.md).
+
 ### Lokale Datenbank starten
 
 Voraussetzungen sind Docker mit Compose-Unterstützung und eine unterstützte Node.js-LTS-Version.
