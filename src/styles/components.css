@@ -19,6 +19,8 @@
 }
 .startup-error__eyebrow { color: var(--color-text-muted); font-weight: 700; }
 .startup-error__actions { display: flex; flex-wrap: wrap; gap: var(--space-3); margin-top: var(--space-5); }
+.startup-login { display: grid; gap: var(--space-3); margin-top: var(--space-5); }
+.startup-login input { width: 100%; }
 
 .board-app {
   min-height: 100vh;

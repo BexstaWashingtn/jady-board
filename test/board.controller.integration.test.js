@@ -221,6 +221,19 @@ describe("Board-Controller-Integration", () => {
     assert.equal(controller.getState().version, 3);
   });
 
+  test("bietet im authentifizierten API-Modus eine Abmeldung an", () => {
+    const state = createInitialBoardState();
+    let loggedOut = 0;
+    const workspace = { activeBoardId: "api-board", boards: { "api-board": state }, activeUserId: "user-1", users: { "user-1": { id: "user-1", name: "API User", initials: "AU", preferences: { theme: /** @type {const} */ ("system") } } } };
+    const controller = createBoardController(createApp("#root"), {
+      workspace, persist: () => true, seedShowcase: false,
+      logoutRemote: () => { loggedOut += 1; },
+    });
+    controller.actions.openAppSettings();
+    findButton("Abmelden").click();
+    assert.equal(loggedOut, 1);
+  });
+
   test("warnt dauerhaft bei einem Speicherfehler und erlaubt einen erneuten Versuch", () => {
     const controller = startController();
     const workingStorage = localStorage;

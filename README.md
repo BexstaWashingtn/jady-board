@@ -278,6 +278,14 @@ RATE_LIMIT_WINDOW_MS=60000
 
 Ein Request authentifiziert sich anschließend mit `Authorization: Bearer <token>`. Health- und Readiness-Endpunkte bleiben vom Rate Limit ausgenommen. Der Limiter arbeitet pro Serverprozess und Client-IP; mehrere Serverinstanzen benötigen einen gemeinsamen Limiter-Adapter.
 
+Im Browser zeigt der API-Modus bei einer geschützten API automatisch eine
+Login-Ansicht. Das dort eingegebene Token wird API-spezifisch ausschließlich im
+`sessionStorage` gehalten, bei allen Requests als Bearer-Credential übertragen
+und beim Schließen der Browser-Sitzung oder beim Abmelden entfernt. Ein `401`
+führt zurück zum Login; `403`, `409` und `429` werden als unterscheidbare,
+verständliche Aktionsfehler angezeigt. Tokens gehören weder in die URL noch in
+den dauerhaften `localStorage`.
+
 Der Browser bleibt standardmäßig Local-first. Die lesende API-Anbindung kann für die Migration explizit aktiviert werden:
 
 ```text
