@@ -87,6 +87,24 @@
   align-items: center;
   gap: 10px;
 }
+.topbar-logout {
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid #4b4f59;
+  border-radius: 7px;
+  cursor: pointer;
+  color: #d7dae0;
+  background: transparent;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 650;
+}
+.topbar-logout:hover,
+.topbar-logout:focus-visible {
+  border-color: #777d89;
+  color: white;
+  background: #292d35;
+}
 .icon-button,
 .avatar,
 .team-switch,

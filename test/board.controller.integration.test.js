@@ -229,9 +229,18 @@ describe("Board-Controller-Integration", () => {
       workspace, persist: () => true, seedShowcase: false,
       logoutRemote: () => { loggedOut += 1; },
     });
-    controller.actions.openAppSettings();
-    findButton("Abmelden").click();
+    const logoutButtons = [...document.querySelectorAll("button")].filter((button) => button.textContent === "Abmelden");
+    assert.equal(logoutButtons.length, 1);
+    assert.equal(logoutButtons[0].classList.contains("topbar-logout"), true);
+    assert.ok(logoutButtons[0].closest(".topbar__actions"));
+    logoutButtons[0].click();
     assert.equal(loggedOut, 1);
+  });
+
+  test("blendet die Abmeldung im lokalen Modus aus", () => {
+    startController();
+    const logout = [...document.querySelectorAll("button")].find((button) => button.textContent === "Abmelden");
+    assert.equal(logout, undefined);
   });
 
   test("warnt dauerhaft bei einem Speicherfehler und erlaubt einen erneuten Versuch", () => {

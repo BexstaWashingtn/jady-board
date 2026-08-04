@@ -36,7 +36,7 @@ export function createAppSettings(workspace, actions) {
       ] },
       .../** @type {import("../../core/JaDyDoCo.js").JaDyNode[]} */ (workspace.apiAuthenticated ? [{ tagName: "section", class: "app-settings-section", children: [
         { tagName: "h3", text: "API-Sitzung" },
-        { tagName: "p", class: "field-help", text: "Das Zugriffstoken ist nur in dieser Browser-Sitzung gespeichert." },
+        { tagName: "p", class: "field-help", text: "Die Anmeldung wird über den konfigurierten Identity Provider verwaltet." },
         { tagName: "button", type: "button", class: "button button--danger", text: "Abmelden", events: { click: actions.logout } },
       ] }] : []),
     ] },

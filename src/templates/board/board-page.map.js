@@ -135,6 +135,13 @@ export function createBoardPage(state, viewState, actions, workspace) {
                   )?.initials ?? "?",
                 events: { click: actions.openUserSettings },
               },
+              .../** @type {import("../../core/JaDyDoCo.js").JaDyNode[]} */ (workspace.apiAuthenticated ? [{
+                tagName: "button",
+                type: "button",
+                class: "topbar-logout",
+                text: "Abmelden",
+                events: { click: actions.logout },
+              }] : []),
             ],
           },
         ],
