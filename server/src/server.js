@@ -15,6 +15,28 @@ import { createIdentityRepository } from "./modules/identity/identity.repository
  * @param {ReturnType<typeof loadConfig>} config
  */
 export function createJaDyServer(config) {
+  const application = createJaDyApplication(config);
+  const server = createServer(application.handler);
+
+  async function close() {
+    if (server.listening) {
+      await new Promise((resolve, reject) => {
+        server.close((error) => error ? reject(error) : resolve(undefined));
+      });
+    }
+    await application.close();
+  }
+
+  return { server, database: application.database, close };
+}
+
+/**
+ * Creates the shared API dependencies without binding a TCP listener. This is
+ * used by both the local Node.js server and serverless runtimes.
+ *
+ * @param {ReturnType<typeof loadConfig>} config
+ */
+export function createJaDyApplication(config) {
   const database = createDatabase(config);
   const boardRepository = createBoardRepository(database);
   const boardService = createBoardService(boardRepository);
@@ -27,7 +49,7 @@ export function createJaDyServer(config) {
     : config.authMode === "controlled-bearer"
       ? createBearerIdentityResolver(config.bearerIdentities)
       : createDevelopmentIdentityResolver(config.devUserId);
-  const server = createServer(createApiHandler({
+  const handler = createApiHandler({
     database,
     boardService,
     resolveIdentity,
@@ -37,18 +59,13 @@ export function createJaDyServer(config) {
     authPublicConfig: config.authMode === "clerk"
       ? { mode: "clerk", publishableKey: config.clerk?.publishableKey ?? "" }
       : { mode: config.authMode },
-  }));
+  });
 
   async function close() {
-    if (server.listening) {
-      await new Promise((resolve, reject) => {
-        server.close((error) => error ? reject(error) : resolve(undefined));
-      });
-    }
     await database.end();
   }
 
-  return { server, database, close };
+  return { handler, database, close };
 }
 
 async function main() {

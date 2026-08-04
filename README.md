@@ -228,6 +228,8 @@ vertagten Produktentscheidungen stehen in
 Das verbindliche Zielmodell für Teams, getrennte Team- und Boardrollen,
 Einladungen und Account-Verknüpfungen beschreibt
 [`ADR 0001`](docs/adr/0001-team-tenancy-and-account-linking.md).
+Die Vercel-, Neon- und Clerk-Konfiguration sowie der kontrollierte Release- und
+Rollback-Ablauf sind in [`docs/deployment.md`](docs/deployment.md) beschrieben.
 
 ### Lokale Datenbank starten
 
