@@ -277,6 +277,23 @@ Die API verwendet standardmäßig Port `3000`:
 - `DELETE /api/boards/:boardId/stages/:stageId` löscht eine Stage versioniert und übernimmt vorhandene Tasks transaktional in eine zulässige Ziel-Stage.
 - `PATCH /api/boards/:boardId` aktualisiert Name, Pfad und Beschreibung eines Boards versioniert als Owner.
 
+### Neon-Verbindungen
+
+Für Neon werden Laufzeit- und Migrationsverbindung getrennt konfiguriert. Der
+Server verwendet den PgBouncer-Pooler; Schema-Migrationen verwenden wegen ihrer
+Transaktionen und Advisory Locks den direkten Endpoint. Beide Verbindungen
+erzwingen eine vollständige TLS-Prüfung:
+
+```dotenv
+DATABASE_URL=postgresql://...@ep-...-pooler.eu-central-1.aws.neon.tech/neondb?sslmode=verify-full
+DATABASE_MIGRATION_URL=postgresql://...@ep-....eu-central-1.aws.neon.tech/neondb?sslmode=verify-full
+DATABASE_SSL=true
+```
+
+`DATABASE_MIGRATION_URL` darf lokal leer bleiben; dann verwendet der Migrator
+weiterhin `DATABASE_URL`. Zugangsdaten gehören ausschließlich in `.env` oder den
+Secret Store der jeweiligen Laufzeit und niemals ins Repository.
+
 Für den regulären API-Modus authentifiziert Clerk den Benutzer vollständig. Das
 JaDy Board speichert keine Passwörter und übernimmt keine Clerk-Rollen. Nach
 `npm run db:migrate` wird eine Clerk-Identität explizit über `(issuer, subject)`
@@ -361,7 +378,7 @@ Das initiale relationale Schema trennt Benutzer, Präferenzen, Boards, Mitgliede
 ## Aktuelle Grenzen
 
 - Der Browser-Client arbeitet standardmäßig weiterhin mit seinem lokalen Workspace. Im optionalen API-Modus werden neue Tasks, Task-Metadaten und Statusänderungen aus dem Task-Dialog bereits gespeichert; alle anderen Änderungen gehen beim Neuladen weiterhin verloren.
-- Eine interaktive Browser-Anmeldung und ein externer Identity Provider fehlen noch; für kontrollierte API-Clients stehen opake Bearer-Credentials zur Verfügung.
+- Clerk stellt die interaktive Browser-Anmeldung bereit. Registrierung, Einladungen, Teams und weitere Account-Verknüpfungsabläufe sind noch nicht als Produktprozesse umgesetzt.
 - Gleichzeitige Bearbeitung durch mehrere Personen wird nicht unterstützt.
 - Automatische oder zeitgesteuerte Backups sind nicht vorhanden; Exporte müssen manuell ausgelöst werden.
 - Benutzerprofile simulieren Teamrollen nur innerhalb des lokalen Workspace.

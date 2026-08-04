@@ -7,6 +7,7 @@ describe("Server-Konfiguration", () => {
   test("liest eine vollständige Konfiguration", () => {
     assert.deepEqual(loadConfig({
       DATABASE_URL: "postgresql://localhost/jady",
+      DATABASE_MIGRATION_URL: "postgresql://localhost/jady_migrations",
       DATABASE_SSL: "true",
       SERVER_HOST: "0.0.0.0",
       SERVER_PORT: "8080",
@@ -16,6 +17,7 @@ describe("Server-Konfiguration", () => {
       RATE_LIMIT_WINDOW_MS: "30000",
     }), {
       databaseUrl: "postgresql://localhost/jady",
+      databaseMigrationUrl: "postgresql://localhost/jady_migrations",
       databaseSsl: true,
       host: "0.0.0.0",
       port: 8080,
@@ -34,6 +36,7 @@ describe("Server-Konfiguration", () => {
     assert.equal(config.host, "127.0.0.1");
     assert.equal(config.port, 3000);
     assert.equal(config.databaseSsl, false);
+    assert.equal(config.databaseMigrationUrl, config.databaseUrl);
     assert.equal(config.devUserId, null);
     assert.equal(config.corsOrigin, null);
     assert.deepEqual(config.bearerIdentities, []);

@@ -5,6 +5,7 @@ const DEFAULT_PORT = 3000;
  * @property {string} host
  * @property {number} port
  * @property {string} databaseUrl
+ * @property {string} databaseMigrationUrl
  * @property {boolean} databaseSsl
  * @property {string|null} devUserId
  * @property {string|null} corsOrigin
@@ -46,6 +47,7 @@ export function loadConfig(environment = process.env) {
     host: environment.SERVER_HOST?.trim() || "127.0.0.1",
     port,
     databaseUrl,
+    databaseMigrationUrl: environment.DATABASE_MIGRATION_URL?.trim() || databaseUrl,
     databaseSsl: environment.DATABASE_SSL === "true",
     devUserId,
     corsOrigin: parseCorsOrigin(environment.CORS_ORIGIN),
