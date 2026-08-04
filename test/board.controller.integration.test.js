@@ -202,6 +202,47 @@ describe("Board-Controller-Integration", () => {
     assert.equal(saved.boards["board-1"].project.description, "Release-Steuerung");
   });
 
+  test("persistiert Board-Metadaten im API-Modus", async () => {
+    const state = createInitialBoardState();
+    state.version = 2;
+    let received;
+    const workspace = { activeBoardId: "api-board", boards: { "api-board": state }, activeUserId: "user-1", users: { "user-1": { id: "user-1", name: "API User", initials: "AU", preferences: { theme: /** @type {const} */ ("system") } } } };
+    const controller = createBoardController(createApp("#root"), {
+      workspace, persist: () => true, seedShowcase: false,
+      async updateBoardRemote(_boardId, board) { received = { name: board.project.name, version: board.version }; return { name: board.project.name, path: board.project.path, description: board.project.description, version: 3 }; },
+    });
+    controller.actions.openBoardConfig();
+    const form = document.querySelector(".board-details-form");
+    assert.ok(form instanceof HTMLFormElement);
+    form.elements.namedItem("name").value = "Delivery";
+    await controller.actions.submitBoardDetails({ preventDefault() {}, currentTarget: form });
+    assert.deepEqual(received, { name: "Delivery", version: 2 });
+    assert.equal(controller.getState().project.name, "Delivery");
+    assert.equal(controller.getState().version, 3);
+  });
+
+  test("bietet im authentifizierten API-Modus eine Abmeldung an", () => {
+    const state = createInitialBoardState();
+    let loggedOut = 0;
+    const workspace = { activeBoardId: "api-board", boards: { "api-board": state }, activeUserId: "user-1", users: { "user-1": { id: "user-1", name: "API User", initials: "AU", preferences: { theme: /** @type {const} */ ("system") } } } };
+    const controller = createBoardController(createApp("#root"), {
+      workspace, persist: () => true, seedShowcase: false,
+      logoutRemote: () => { loggedOut += 1; },
+    });
+    const logoutButtons = [...document.querySelectorAll("button")].filter((button) => button.textContent === "Abmelden");
+    assert.equal(logoutButtons.length, 1);
+    assert.equal(logoutButtons[0].classList.contains("topbar-logout"), true);
+    assert.ok(logoutButtons[0].closest(".topbar__actions"));
+    logoutButtons[0].click();
+    assert.equal(loggedOut, 1);
+  });
+
+  test("blendet die Abmeldung im lokalen Modus aus", () => {
+    startController();
+    const logout = [...document.querySelectorAll("button")].find((button) => button.textContent === "Abmelden");
+    assert.equal(logout, undefined);
+  });
+
   test("warnt dauerhaft bei einem Speicherfehler und erlaubt einen erneuten Versuch", () => {
     const controller = startController();
     const workingStorage = localStorage;
@@ -427,6 +468,270 @@ describe("Board-Controller-Integration", () => {
     assert.equal(document.querySelector(".task-edit-form"), null);
     assert.equal(controller.getState().tasks["KAN-18"].title, "Überarbeitete Arbeitsansicht");
     assert.equal(controller.getState().tasks["KAN-18"].priority, "high");
+  });
+
+  test("persistiert Task-Metadaten im API-Modus und übernimmt die neue Version", async () => {
+    const state = createInitialBoardState();
+    state.tasks["KAN-18"].version = 3;
+    let received;
+    const workspace = {
+      activeBoardId: "api-board", boards: { "api-board": state }, activeUserId: "user-1",
+      users: { "user-1": { id: "user-1", name: "API User", initials: "AU", preferences: { theme: /** @type {const} */ ("system") } } },
+    };
+    const controller = createBoardController(createApp("#root"), {
+      workspace, persist: () => true, seedShowcase: false,
+      async updateTaskRemote(boardId, task) {
+        received = { boardId, title: task.title, version: task.version };
+        return { version: 4 };
+      },
+    });
+    taskCard("KAN-18").click();
+    findButton("Bearbeiten").click();
+    const form = document.querySelector(".task-edit-form");
+    assert.ok(form instanceof HTMLFormElement);
+    form.elements.namedItem("title").value = "Auf dem Server gespeichert";
+
+    await controller.actions.submitTaskDetails({ preventDefault() {}, currentTarget: form });
+
+    assert.deepEqual(received, { boardId: "api-board", title: "Auf dem Server gespeichert", version: 3 });
+    assert.equal(controller.getState().tasks["KAN-18"].version, 4);
+    assert.equal(document.querySelector(".task-edit-form"), null);
+  });
+
+  test("rollt Task-Metadaten bei einem API-Konflikt zurück", async () => {
+    const state = createInitialBoardState();
+    state.tasks["KAN-18"].version = 3;
+    const originalTitle = state.tasks["KAN-18"].title;
+    const workspace = {
+      activeBoardId: "api-board", boards: { "api-board": state }, activeUserId: "user-1",
+      users: { "user-1": { id: "user-1", name: "API User", initials: "AU", preferences: { theme: /** @type {const} */ ("system") } } },
+    };
+    const controller = createBoardController(createApp("#root"), {
+      workspace, persist: () => true, seedShowcase: false,
+      async updateTaskRemote() { throw new Error("Der Task wurde zwischenzeitlich geändert."); },
+    });
+    taskCard("KAN-18").click();
+    findButton("Bearbeiten").click();
+    const form = document.querySelector(".task-edit-form");
+    assert.ok(form instanceof HTMLFormElement);
+    form.elements.namedItem("title").value = "Nicht gespeichert";
+
+    await controller.actions.submitTaskDetails({ preventDefault() {}, currentTarget: form });
+
+    assert.equal(controller.getState().tasks["KAN-18"].title, originalTitle);
+    assert.ok(document.querySelector(".task-edit-form"));
+    assert.match(document.body.textContent, /zwischenzeitlich geändert/);
+    controller.destroy();
+  });
+
+  test("persistiert Statusänderungen aus dem Task-Dialog im API-Modus", async () => {
+    const state = createInitialBoardState();
+    state.tasks["KAN-18"].version = 3;
+    let received;
+    const workspace = {
+      activeBoardId: "api-board", boards: { "api-board": state }, activeUserId: "user-1",
+      users: { "user-1": { id: "user-1", name: "API User", initials: "AU", preferences: { theme: /** @type {const} */ ("system") } } },
+    };
+    const controller = createBoardController(createApp("#root"), {
+      workspace, persist: () => true, seedShowcase: false,
+      async moveTaskRemote(boardId, task, stageId, targetIndex) {
+        received = { boardId, taskId: task.id, stageId, targetIndex, version: task.version };
+        return { version: 4 };
+      },
+    });
+    taskCard("KAN-18").click();
+    const form = document.querySelector(".task-status-form");
+    assert.ok(form instanceof HTMLFormElement);
+    form.elements.namedItem("columnId").value = "progress";
+
+    await controller.actions.submitTaskWork({ preventDefault() {}, currentTarget: form });
+
+    assert.deepEqual(received, { boardId: "api-board", taskId: "KAN-18", stageId: "progress", targetIndex: 2, version: 3 });
+    assert.ok(controller.getState().columns.find(({ id }) => id === "progress").taskIds.includes("KAN-18"));
+    assert.equal(controller.getState().tasks["KAN-18"].version, 4);
+    controller.destroy();
+  });
+
+  test("ersetzt einen temporären Task im API-Modus durch die Serveridentität", async () => {
+    const state = createInitialBoardState();
+    const workspace = {
+      activeBoardId: "api-board", boards: { "api-board": state }, activeUserId: "user-1",
+      users: { "user-1": { id: "user-1", name: "API User", initials: "AU", preferences: { theme: /** @type {const} */ ("system") } } },
+    };
+    let temporaryId = "";
+    const controller = createBoardController(createApp("#root"), {
+      workspace, persist: () => true, seedShowcase: false,
+      async createTaskRemote(_boardId, task) {
+        temporaryId = task.id;
+        return { ...task, id: "912e8124-aa18-5848-bac7-3486be614b78", version: 1 };
+      },
+    });
+    controller.actions.openCreateTask("backlog");
+    const form = document.querySelector(".task-form");
+    assert.ok(form instanceof HTMLFormElement);
+    form.elements.namedItem("title").value = "Server Task";
+
+    await controller.actions.submitCreateTask({ preventDefault() {}, currentTarget: form });
+
+    assert.equal(controller.getState().tasks[temporaryId], undefined);
+    assert.equal(controller.getState().tasks["912e8124-aa18-5848-bac7-3486be614b78"].title, "Server Task");
+    assert.ok(controller.getState().columns[0].taskIds.includes("912e8124-aa18-5848-bac7-3486be614b78"));
+  });
+
+  test("persistiert die Selbstübernahme eines Tasks im API-Modus", async () => {
+    const state = createInitialBoardState();
+    state.tasks["KAN-18"].version = 2;
+    let received;
+    const workspace = {
+      activeBoardId: "api-board", boards: { "api-board": state }, activeUserId: "user-1",
+      users: { "user-1": { id: "user-1", name: "API User", initials: "AU", preferences: { theme: /** @type {const} */ ("system") } } },
+    };
+    const controller = createBoardController(createApp("#root"), {
+      workspace, persist: () => true, seedShowcase: false,
+      async assignTaskRemote(_boardId, task) { received = { assigneeId: task.assigneeId, version: task.version }; return { assigneeId: "user-1", version: 3 }; },
+    });
+    await controller.actions.claimTask("KAN-18");
+    assert.deepEqual(received, { assigneeId: "user-1", version: 2 });
+    assert.equal(controller.getState().tasks["KAN-18"].version, 3);
+  });
+
+  test("übernimmt kanonische Todos und Version aus der API", async () => {
+    const state = createInitialBoardState();
+    state.tasks["KAN-18"].version = 2;
+    const workspace = {
+      activeBoardId: "api-board", boards: { "api-board": state }, activeUserId: "user-1",
+      users: { "user-1": { id: "user-1", name: "API User", initials: "AU", preferences: { theme: /** @type {const} */ ("system") } } },
+    };
+    const controller = createBoardController(createApp("#root"), {
+      workspace, persist: () => true, seedShowcase: false,
+      async syncTaskTodosRemote(_boardId, task) {
+        const todos = task.todos.map((todo, index) => ({ ...todo, id: `00000000-0000-4000-8000-00000000000${index}` }));
+        return { todos, version: 3 };
+      },
+    });
+    controller.actions.openTask("KAN-18");
+    const input = document.querySelector("#new-todo");
+    assert.ok(input instanceof HTMLInputElement);
+    input.value = "Server Todo";
+    await controller.actions.addTodo("KAN-18");
+    const todo = controller.getState().tasks["KAN-18"].todos.find(({ text }) => text === "Server Todo");
+    assert.match(todo.id, /^[0-9a-f-]{36}$/);
+    assert.equal(controller.getState().tasks["KAN-18"].version, 3);
+  });
+
+  test("löscht Tasks im API-Modus ohne lokales Undo", async () => {
+    const state = createInitialBoardState();
+    state.tasks["KAN-18"].version = 2;
+    let deletedVersion = 0;
+    const workspace = {
+      activeBoardId: "api-board", boards: { "api-board": state }, activeUserId: "user-1",
+      users: { "user-1": { id: "user-1", name: "API User", initials: "AU", preferences: { theme: /** @type {const} */ ("system") } } },
+    };
+    const controller = createBoardController(createApp("#root"), {
+      workspace, persist: () => true, seedShowcase: false,
+      async deleteTaskRemote(_boardId, task) { deletedVersion = task.version; },
+    });
+    await controller.actions.deleteTask("KAN-18");
+    assert.equal(deletedVersion, 2);
+    assert.equal(controller.getState().tasks["KAN-18"], undefined);
+    assert.equal(document.querySelector(".undo-toast"), null);
+    controller.destroy();
+  });
+
+  test("persistiert Drag-and-drop im API-Modus ohne lokales Undo", async () => {
+    const state = createInitialBoardState();
+    state.tasks["KAN-18"].version = 2;
+    let received;
+    const workspace = {
+      activeBoardId: "api-board", boards: { "api-board": state }, activeUserId: "user-1",
+      users: { "user-1": { id: "user-1", name: "API User", initials: "AU", preferences: { theme: /** @type {const} */ ("system") } } },
+    };
+    const controller = createBoardController(createApp("#root"), {
+      workspace, persist: () => true, seedShowcase: false,
+      async moveTaskRemote(_boardId, task, stageId, targetIndex) { received = { version: task.version, stageId, targetIndex }; return { version: 3 }; },
+    });
+    const transfer = dragTransfer();
+    controller.actions.startTaskDrag(dragEvent(taskCard("KAN-18"), transfer), "KAN-18");
+    await controller.actions.dropTask(dragEvent(column("progress"), transfer), "progress");
+    assert.deepEqual(received, { version: 2, stageId: "progress", targetIndex: 2 });
+    assert.equal(controller.getState().tasks["KAN-18"].version, 3);
+    assert.equal(document.querySelector(".undo-toast"), null);
+    controller.destroy();
+  });
+
+  test("persistiert Stage-Einstellungen im API-Modus", async () => {
+    const state = createInitialBoardState();
+    state.columns[0].version = 2;
+    let received;
+    const workspace = { activeBoardId: "api-board", boards: { "api-board": state }, activeUserId: "user-1", users: { "user-1": { id: "user-1", name: "API User", initials: "AU", preferences: { theme: /** @type {const} */ ("system") } } } };
+    const controller = createBoardController(createApp("#root"), {
+      workspace, persist: () => true, seedShowcase: false,
+      async updateStageRemote(_boardId, stage) { received = { title: stage.title, version: stage.version }; return { version: 3 }; },
+    });
+    controller.actions.openStageConfig();
+    controller.actions.editStage("backlog");
+    const form = document.querySelector("#stage-editor");
+    assert.ok(form instanceof HTMLFormElement);
+    form.elements.namedItem("title").value = "Ideen";
+    await controller.actions.submitStage({ preventDefault() {}, currentTarget: form });
+    assert.deepEqual(received, { title: "Ideen", version: 2 });
+    assert.equal(controller.getState().columns[0].version, 3);
+  });
+
+  test("erstellt Stages im API-Modus mit der Server-Identität", async () => {
+    const state = createInitialBoardState();
+    let received;
+    const workspace = { activeBoardId: "api-board", boards: { "api-board": state }, activeUserId: "user-1", users: { "user-1": { id: "user-1", name: "API User", initials: "AU", preferences: { theme: /** @type {const} */ ("system") } } } };
+    const controller = createBoardController(createApp("#root"), {
+      workspace, persist: () => true, seedShowcase: false,
+      async createStageRemote(_boardId, stage) { received = { id: stage.id, title: stage.title }; return { ...stage, id: "server-stage", version: 1 }; },
+    });
+    controller.actions.openStageConfig();
+    controller.actions.createStage();
+    const form = document.querySelector("#stage-editor");
+    assert.ok(form instanceof HTMLFormElement);
+    form.elements.namedItem("title").value = "QA";
+    await controller.actions.submitStage({ preventDefault() {}, currentTarget: form });
+    assert.equal(received.title, "QA");
+    assert.match(received.id, /^stage-/);
+    assert.equal(controller.getState().columns.at(-1).id, "server-stage");
+    assert.equal(controller.getState().columns.at(-1).version, 1);
+  });
+
+  test("sortiert Stages im API-Modus und übernimmt die neue Version", async () => {
+    const state = createInitialBoardState();
+    state.columns[0].version = 2;
+    let received;
+    const workspace = { activeBoardId: "api-board", boards: { "api-board": state }, activeUserId: "user-1", users: { "user-1": { id: "user-1", name: "API User", initials: "AU", preferences: { theme: /** @type {const} */ ("system") } } } };
+    const controller = createBoardController(createApp("#root"), {
+      workspace, persist: () => true, seedShowcase: false,
+      async moveStageRemote(_boardId, stage, targetIndex) { received = { id: stage.id, version: stage.version, targetIndex }; return { position: targetIndex, version: 3 }; },
+    });
+    await controller.actions.moveStage("backlog", 1);
+    assert.deepEqual(received, { id: "backlog", version: 2, targetIndex: 1 });
+    assert.equal(controller.getState().columns[1].id, "backlog");
+    assert.equal(controller.getState().columns[1].version, 3);
+  });
+
+  test("löscht Stages im API-Modus mit serverseitiger Task-Übernahme", async () => {
+    const state = createInitialBoardState();
+    state.columns[0].version = 2;
+    const movedTaskId = state.columns[0].taskIds[0];
+    state.tasks[movedTaskId].version = 4;
+    let received;
+    const workspace = { activeBoardId: "api-board", boards: { "api-board": state }, activeUserId: "user-1", users: { "user-1": { id: "user-1", name: "API User", initials: "AU", preferences: { theme: /** @type {const} */ ("system") } } } };
+    const controller = createBoardController(createApp("#root"), {
+      workspace, persist: () => true, seedShowcase: false,
+      async deleteStageRemote(_boardId, stage, moveTasksTo) { received = { id: stage.id, version: stage.version, moveTasksTo }; },
+    });
+    controller.actions.requestDeleteStage("backlog");
+    const form = document.querySelector(".stage-editor--delete");
+    assert.ok(form instanceof HTMLFormElement);
+    await controller.actions.confirmDeleteStage({ preventDefault() {}, currentTarget: form });
+    assert.deepEqual(received, { id: "backlog", version: 2, moveTasksTo: "progress" });
+    assert.equal(controller.getState().columns.some(({ id }) => id === "backlog"), false);
+    assert.ok(controller.getState().columns.find(({ id }) => id === "progress").taskIds.includes(movedTaskId));
+    assert.equal(controller.getState().tasks[movedTaskId].version, 5);
   });
 
   test("erlaubt Mitgliedern freie Tasks zu übernehmen und wieder freizugeben", () => {

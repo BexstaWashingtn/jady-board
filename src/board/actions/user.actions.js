@@ -10,6 +10,7 @@ export function createUserActions(context) {
     },
     openUserSettings() { context.overlays.userSettingsOpen = true; context.render(); },
     closeUserSettings() { context.overlays.userSettingsOpen = false; context.render(); },
+    logout() { context.logoutRemote?.(); },
 
     /** @param {string} userId */
     switchUser(userId) {

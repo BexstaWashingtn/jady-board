@@ -1,7 +1,7 @@
 /** @typedef {{id: string, preferences: {theme: string}}} UserView */
-/** @typedef {{ closeAppSettings: () => void, setTheme: (theme: string) => void, exportWorkspace: () => void, openWorkspaceImportPicker: () => void, previewWorkspaceImport: (event: Event) => void, cancelWorkspaceImport: () => void, confirmWorkspaceImport: () => void }} AppSettingsActions */
+/** @typedef {{ closeAppSettings: () => void, setTheme: (theme: string) => void, exportWorkspace: () => void, openWorkspaceImportPicker: () => void, previewWorkspaceImport: (event: Event) => void, cancelWorkspaceImport: () => void, confirmWorkspaceImport: () => void, logout: () => void }} AppSettingsActions */
 
-/** @param {{activeUserId: string, users: UserView[], transfer: { preview: import("../../board/board.transfer.js").ImportPreview | null, error: string | null, lastExportedAt: string | null }}} workspace @param {AppSettingsActions} actions @returns {import("../../core/JaDyDoCo.js").JaDyNode} */
+/** @param {{activeUserId: string, users: UserView[], apiAuthenticated?: boolean, transfer: { preview: import("../../board/board.transfer.js").ImportPreview | null, error: string | null, lastExportedAt: string | null }}} workspace @param {AppSettingsActions} actions @returns {import("../../core/JaDyDoCo.js").JaDyNode} */
 export function createAppSettings(workspace, actions) {
   const active = workspace.users.find(({ id }) => id === workspace.activeUserId) ?? workspace.users[0];
   const { preview, error, lastExportedAt } = workspace.transfer;
@@ -34,6 +34,11 @@ export function createAppSettings(workspace, actions) {
         .../** @type {import("../../core/JaDyDoCo.js").JaDyNode[]} */ (error ? [{ tagName: "p", class: "backup-error", role: "alert", text: error }] : []),
         .../** @type {import("../../core/JaDyDoCo.js").JaDyNode[]} */ (preview ? [importPreview(preview, actions)] : []),
       ] },
+      .../** @type {import("../../core/JaDyDoCo.js").JaDyNode[]} */ (workspace.apiAuthenticated ? [{ tagName: "section", class: "app-settings-section", children: [
+        { tagName: "h3", text: "API-Sitzung" },
+        { tagName: "p", class: "field-help", text: "Die Anmeldung wird über den konfigurierten Identity Provider verwaltet." },
+        { tagName: "button", type: "button", class: "button button--danger", text: "Abmelden", events: { click: actions.logout } },
+      ] }] : []),
     ] },
   ] }] };
 }

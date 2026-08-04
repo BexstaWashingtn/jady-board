@@ -3,10 +3,16 @@
   "version": "0.9.0",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": ">=22 <25"
+  },
   "scripts": {
-    "dev:server": "node --watch server/src/server.js",
-    "start:server": "node server/src/server.js",
-    "db:migrate": "node server/src/db/migrate.js",
+    "build": "node scripts/build-vercel.js",
+    "dev:server": "node --env-file-if-exists=.env --watch server/src/server.js",
+    "start:server": "node --env-file-if-exists=.env server/src/server.js",
+    "db:migrate": "node --env-file-if-exists=.env server/src/db/migrate.js",
+    "db:import": "node --env-file-if-exists=.env server/src/db/import-workspace.js",
+    "db:link-clerk-user": "node --env-file-if-exists=.env server/src/db/link-clerk-user.js",
     "test": "node --test",
     "test:e2e": "playwright test",
     "test:e2e:headed": "playwright test --headed",
@@ -15,6 +21,7 @@
     "typecheck": "tsc --project jsconfig.json"
   },
   "dependencies": {
+    "@clerk/backend": "^3.15.0",
     "pg": "^8.22.0"
   },
   "devDependencies": {

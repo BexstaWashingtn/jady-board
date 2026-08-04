@@ -13,10 +13,14 @@ import { canConfigureBoard, canCreateTask } from "./board.permissions.js";
 import { loadWorkspace, persistWorkspace } from "./board.persistence.js";
 import { createBoardViewState } from "./board.view-state.js";
 
-/** @param {import("../core/JaDyDoCo.js").JaDyDoCo} app */
-export function createBoardController(app) {
-  const workspace = loadWorkspace();
-  let persistenceError = ensureShowcaseData(workspace) && !persistWorkspace(workspace);
+/**
+ * @param {import("../core/JaDyDoCo.js").JaDyDoCo} app
+ * @param {{workspace?: import("./board.persistence.js").BoardWorkspace, persist?: typeof persistWorkspace, seedShowcase?: boolean, updateTaskRemote?: (boardId: string, task: import("./board.state.js").BoardTask) => Promise<Partial<import("./board.state.js").BoardTask>>, moveTaskRemote?: (boardId: string, task: import("./board.state.js").BoardTask, stageId: string, targetIndex: number) => Promise<{version: number}>, createTaskRemote?: (boardId: string, task: import("./board.state.js").BoardTask, stageId: string) => Promise<import("./board.state.js").BoardTask>, assignTaskRemote?: (boardId: string, task: import("./board.state.js").BoardTask) => Promise<{assigneeId: string|null, version: number}>, syncTaskTodosRemote?: (boardId: string, task: import("./board.state.js").BoardTask) => Promise<{todos: import("./board.state.js").TaskTodo[], version: number}>, deleteTaskRemote?: (boardId: string, task: import("./board.state.js").BoardTask) => Promise<void>, updateStageRemote?: (boardId: string, stage: import("./board.state.js").BoardColumn) => Promise<Partial<import("./board.state.js").BoardColumn>>, createStageRemote?: (boardId: string, stage: import("./board.state.js").BoardColumn) => Promise<import("./board.state.js").BoardColumn>, moveStageRemote?: (boardId: string, stage: import("./board.state.js").BoardColumn, targetIndex: number) => Promise<{position: number, version: number}>, deleteStageRemote?: (boardId: string, stage: import("./board.state.js").BoardColumn, moveTasksTo: string|null) => Promise<void>, updateBoardRemote?: (boardId: string, state: import("./board.state.js").BoardState) => Promise<{name: string, path: string, description: string, version: number}>, logoutRemote?: () => void}} [options]
+ */
+export function createBoardController(app, options = {}) {
+  const workspace = options.workspace ?? loadWorkspace();
+  const persist = options.persist ?? persistWorkspace;
+  let persistenceError = options.seedShowcase !== false && ensureShowcaseData(workspace) && !persist(workspace);
   let state = workspace.boards[workspace.activeBoardId];
   /** @type {Record<string, import("./board.view-state.js").BoardViewState>} */
   const boardViewStates = {};
@@ -58,6 +62,18 @@ export function createBoardController(app) {
     moveRejectionMessage,
     moveRejectionLabel,
     replaceWorkspace,
+    updateTaskRemote: options.updateTaskRemote,
+    moveTaskRemote: options.moveTaskRemote,
+    createTaskRemote: options.createTaskRemote,
+    assignTaskRemote: options.assignTaskRemote,
+    syncTaskTodosRemote: options.syncTaskTodosRemote,
+    deleteTaskRemote: options.deleteTaskRemote,
+    updateStageRemote: options.updateStageRemote,
+    createStageRemote: options.createStageRemote,
+    moveStageRemote: options.moveStageRemote,
+    deleteStageRemote: options.deleteStageRemote,
+    updateBoardRemote: options.updateBoardRemote,
+    logoutRemote: options.logoutRemote,
   };
 
   const rawActions = {
@@ -124,6 +140,7 @@ export function createBoardController(app) {
       users: Object.values(workspace.users),
       persistenceError,
       transfer: overlays.transfer,
+      apiAuthenticated: Boolean(options.logoutRemote),
     }));
     dialogManager.afterRender();
   }
@@ -196,7 +213,7 @@ export function createBoardController(app) {
 
   function saveState() {
     workspace.boards[workspace.activeBoardId] = state;
-    persistenceError = !persistWorkspace(workspace);
+    persistenceError = !persist(workspace);
   }
 
   /** @param {import("./board.persistence.js").BoardWorkspace} nextWorkspace */

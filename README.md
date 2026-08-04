@@ -2,9 +2,18 @@
 
 **Live-Version:** [https://jady-board.vercel.app](https://jady-board.vercel.app)
 
-JaDy Board ist eine browserbasierte Kanban-Anwendung zur Organisation von Aufgaben, Arbeitsabläufen und kleinen Teams. Die Oberfläche wurde vollständig mit dem eigenen **JaDyDoCo-Framework** (JavaScript Dynamic DOM Constructor) umgesetzt und kommt ohne Frontend-Framework und ohne produktive Laufzeitabhängigkeiten aus.
+JaDy Board ist eine browserbasierte Kanban-Anwendung zur Organisation von Aufgaben, Arbeitsabläufen und kleinen Teams. Die Oberfläche wurde vollständig mit dem eigenen **JaDyDoCo-Framework** (JavaScript Dynamic DOM Constructor) umgesetzt und kommt ohne Frontend-Framework und ohne produktive Frontend-Laufzeitabhängigkeiten aus.
 
-Das Projekt läuft vollständig im Browser. Boards, Aufgaben, Benutzerprofile und Einstellungen werden lokal im `localStorage` gespeichert.
+Das Repository unterstützt zwei klar getrennte Betriebsmodi:
+
+- **Local-first (Standard und produktive Live-Version):** Die Anwendung läuft vollständig im Browser. Boards, Aufgaben, Benutzerprofile und Einstellungen werden im `localStorage` gespeichert.
+- **PostgreSQL-API (Entwicklungsmodus):** Ein optionaler Node.js-Server erprobt relationale Persistenz und serverseitige Schreiboperationen. Dieser Modus besitzt noch keine produktionsfähige Authentifizierung.
+
+Ohne ausdrücklichen API-Opt-in bleibt der Local-first-Client vollständig unabhängig vom Server.
+
+Kann ein ausdrücklich ausgewählter API-Workspace nicht geladen werden, zeigt
+der Client einen Fehlerzustand und wechselt nicht automatisch in den lokalen
+Workspace. So landen Änderungen nicht unbemerkt in der falschen Datenquelle.
 
 ## Funktionsumfang
 
@@ -127,6 +136,8 @@ npm run test:e2e
 npm run test:e2e:headed
 ```
 
+Die PostgreSQL-Integrationstests und der vollständige lokale Coverage-Gate benötigen `DATABASE_URL_TEST`. Starte dafür zuerst PostgreSQL mit `docker compose up -d postgres`, führe `npm run db:migrate` aus und setze `DATABASE_URL_TEST` auf die Testdatenbank. Ohne diese Variable werden die Datenbankintegrationen übersprungen; dadurch kann der globale Branch-Coverage-Grenzwert lokal unterschritten werden.
+
 Die Tests decken unter anderem Rendering, State-Operationen, Filter, Persistenz, Berechtigungen, Stages, WIP-Limits, Übergangsregeln, Todos, Fälligkeiten und Undo-Kommandos ab. Die Playwright-Suite prüft zusätzlich in Chromium, Firefox und WebKit den echten Browserstart, das Erstellen und Persistieren einer Aufgabe, Drag-and-drop sowie die Tastaturbedienung eines Dialogs.
 
 ## Technische Architektur
@@ -204,7 +215,21 @@ Die Anwendung setzt moderne Browser-APIs voraus, insbesondere ES-Module, `struct
 
 ## Server und PostgreSQL
 
-Die Servermigration wird parallel zum weiterhin funktionsfähigen Local-first-Client aufgebaut. Die erste Ausbaustufe enthält einen Node.js-HTTP-Server, PostgreSQL-Migrationen und getrennte Liveness- und Readiness-Endpunkte. Board-Daten werden noch nicht aus der API geladen.
+Die Servermigration wird parallel zum weiterhin funktionsfähigen Local-first-Client aufgebaut. Der Node.js-HTTP-Server stellt Liveness, Readiness und eine erste lesende Board-API bereit. Der Browser-Client arbeitet bis zur folgenden Integrationsstufe weiterhin mit seinem lokalen Workspace.
+
+> **Sicherheitsgrenze:** Der Server unterstützt verifizierte, opake Bearer-Credentials über `API_BEARER_IDENTITIES`. `DEV_USER_ID` bleibt ein ausdrücklich davon getrennter Entwicklungsadapter und darf nicht gleichzeitig konfiguriert werden. CORS ist standardmäßig geschlossen, geschützte Routen sind rate-limitiert und jede Antwort trägt eine Request-ID sowie grundlegende Security-Header. Für große, horizontal skalierte Installationen muss der mitgelieferte In-Memory-Limiter durch einen gemeinsamen Store ersetzt und die Credential-Verwaltung an einen dedizierten Identity Provider angebunden werden.
+
+Die Identity-Schicht trennt bereits die Verifikation eines externen Principals
+(`issuer` und `subject`) von dessen Zuordnung zu einer lokalen PostgreSQL-
+Benutzer-ID. Rollen, Board-Mitgliedschaften und Berechtigungen bleiben dadurch
+providerunabhängig. Der vollständige Integrationsvertrag und die bewusst
+vertagten Produktentscheidungen stehen in
+[`docs/identity-architecture.md`](docs/identity-architecture.md).
+Das verbindliche Zielmodell für Teams, getrennte Team- und Boardrollen,
+Einladungen und Account-Verknüpfungen beschreibt
+[`ADR 0001`](docs/adr/0001-team-tenancy-and-account-linking.md).
+Die Vercel-, Neon- und Clerk-Konfiguration sowie der kontrollierte Release- und
+Rollback-Ablauf sind in [`docs/deployment.md`](docs/deployment.md) beschrieben.
 
 ### Lokale Datenbank starten
 
@@ -214,7 +239,16 @@ Voraussetzungen sind Docker mit Compose-Unterstützung und eine unterstützte No
 docker compose up -d postgres
 ```
 
-Die Standardkonfiguration liegt in `.env.example`. Node.js lädt `.env` nicht automatisch; die Werte müssen vor dem Start als Umgebungsvariablen gesetzt oder mit einem geeigneten Prozessmanager geladen werden.
+Die Standardkonfiguration liegt in `.env.example`. Kopiere sie vor dem ersten
+Start nach `.env`; die npm-Skripte laden diese lokale Datei automatisch. Bereits
+gesetzte Umgebungsvariablen haben weiterhin Vorrang.
+
+```powershell
+Copy-Item .env.example .env
+```
+
+Unter Bash entspricht das `cp .env.example .env`. Die Datei `.env` wird nicht
+in Git eingecheckt.
 
 ```bash
 # Datenbankschema anlegen oder aktualisieren
@@ -231,13 +265,122 @@ Die API verwendet standardmäßig Port `3000`:
 
 - `GET /api/health` prüft, ob der Node.js-Prozess antwortet.
 - `GET /api/ready` prüft zusätzlich die PostgreSQL-Verbindung.
+- `GET /api/boards` listet die Boards des mit `DEV_USER_ID` konfigurierten Entwicklungsbenutzers.
+- `GET /api/boards/:id` liefert ein zugängliches Board einschließlich Mitglieder, Spalten, Tasks, Todos und Übergänge.
+- `PATCH /api/boards/:boardId/tasks/:taskId` aktualisiert Titel, Kategorie, Priorität und Fälligkeit eines Tasks. Das Feld `version` schützt vor dem Überschreiben paralleler Änderungen.
+- `PATCH /api/boards/:boardId/tasks/:taskId/position` verschiebt einen Task transaktional in eine andere Stage und prüft Rollen, Übergänge, offene Todos, harte WIP-Limits und die Task-Version.
+- `POST /api/boards/:boardId/tasks` erstellt einen Task mit atomar vergebener Tasknummer und prüft Mitgliedschaft, Zuweisung und harte WIP-Limits.
+- `PATCH /api/boards/:boardId/tasks/:taskId/assignment` weist einen Task versioniert zu oder gibt ihn frei und setzt die Owner-/Bearbeiterregeln serverseitig durch.
+- `PATCH /api/boards/:boardId/tasks/:taskId/todos` synchronisiert die Todo-Liste transaktional, normalisiert neue IDs und schützt Änderungen über die Task-Version.
+- `DELETE /api/boards/:boardId/tasks/:taskId?version=...` löscht einen Task als Board-Owner transaktional und schließt die Positionslücke in seiner Stage.
+- `PATCH /api/boards/:boardId/stages/:stageId` aktualisiert Stage-Einstellungen, Übergänge und WIP-Regeln versioniert als Board-Owner; der Stage-Editor verwendet diesen Endpunkt im API-Modus.
+- `POST /api/boards/:boardId/stages` legt eine neue Stage samt Übergängen als Board-Owner an; der Stage-Editor übernimmt die serverseitige UUID und Version.
+- `PATCH /api/boards/:boardId/stages/:stageId/position` sortiert eine Stage versioniert und transaktional neu ein.
+- `DELETE /api/boards/:boardId/stages/:stageId` löscht eine Stage versioniert und übernimmt vorhandene Tasks transaktional in eine zulässige Ziel-Stage.
+- `PATCH /api/boards/:boardId` aktualisiert Name, Pfad und Beschreibung eines Boards versioniert als Owner.
+
+### Neon-Verbindungen
+
+Für Neon werden Laufzeit- und Migrationsverbindung getrennt konfiguriert. Der
+Server verwendet den PgBouncer-Pooler; Schema-Migrationen verwenden wegen ihrer
+Transaktionen und Advisory Locks den direkten Endpoint. Beide Verbindungen
+erzwingen eine vollständige TLS-Prüfung:
+
+```dotenv
+DATABASE_URL=postgresql://...@ep-...-pooler.eu-central-1.aws.neon.tech/neondb?sslmode=verify-full
+DATABASE_MIGRATION_URL=postgresql://...@ep-....eu-central-1.aws.neon.tech/neondb?sslmode=verify-full
+DATABASE_SSL=true
+```
+
+`DATABASE_MIGRATION_URL` darf lokal leer bleiben; dann verwendet der Migrator
+weiterhin `DATABASE_URL`. Zugangsdaten gehören ausschließlich in `.env` oder den
+Secret Store der jeweiligen Laufzeit und niemals ins Repository.
+
+Für den regulären API-Modus authentifiziert Clerk den Benutzer vollständig. Das
+JaDy Board speichert keine Passwörter und übernimmt keine Clerk-Rollen. Nach
+`npm run db:migrate` wird eine Clerk-Identität explizit über `(issuer, subject)`
+in `external_identities` mit einem vorhandenen lokalen `users.id` verknüpft;
+Boards, Rollen, Mitgliedschaften und alle Berechtigungsentscheidungen bleiben
+in PostgreSQL.
+
+```dotenv
+AUTH_MODE=clerk
+CLERK_PUBLISHABLE_KEY=pk_test_...
+CLERK_SECRET_KEY=sk_test_...
+CLERK_AUTHORIZED_PARTIES=http://127.0.0.1:4173
+CORS_ORIGIN=http://127.0.0.1:4173
+```
+
+Der Browser bezieht die öffentliche Auth-Konfiguration über
+`GET /api/auth/config`, rendert die Clerk-Anmeldung und sendet pro API-Request
+ein aktuelles Clerk-Session-Token. Ein gültiger, aber noch nicht lokal
+verknüpfter Clerk-Benutzer erhält `403 IDENTITY_NOT_LINKED`. Details und ein
+SQL-Beispiel zur kontrollierten Verknüpfung stehen in
+[`docs/identity-architecture.md`](docs/identity-architecture.md).
+
+Eine vorhandene lokale Benutzer-ID kann zunächst ohne Änderung geprüft und
+anschließend explizit verknüpft werden:
+
+```powershell
+npm run db:link-clerk-user -- --local-user <uuid> --issuer <https-clerk-issuer> --subject <user_...> --dry-run
+npm run db:link-clerk-user -- --local-user <uuid> --issuer <https-clerk-issuer> --subject <user_...>
+```
+
+`DEV_USER_ID` ist eine vorübergehende Entwicklungsidentität und muss der UUID eines importierten Benutzers entsprechen. Für kontrollierte Tests kann stattdessen eine JSON-Liste opaker Credentials konfiguriert werden; Tokens benötigen mindestens 32 Zeichen:
+
+```dotenv
+AUTH_MODE=controlled-bearer
+API_BEARER_IDENTITIES=[{"userId":"8acf3017-cf6e-589b-bd47-a1d8ccec16a8","token":"replace-with-at-least-32-random-characters"}]
+CORS_ORIGIN=https://board.example.com
+RATE_LIMIT_REQUESTS=120
+RATE_LIMIT_WINDOW_MS=60000
+```
+
+Ein Request authentifiziert sich anschließend mit `Authorization: Bearer <token>`. Health- und Readiness-Endpunkte bleiben vom Rate Limit ausgenommen. Der Limiter arbeitet pro Serverprozess und Client-IP; mehrere Serverinstanzen benötigen einen gemeinsamen Limiter-Adapter.
+
+Im Browser zeigt der API-Modus bei einer geschützten API automatisch eine
+Login-Ansicht. Das dort eingegebene Token wird API-spezifisch ausschließlich im
+`sessionStorage` gehalten, bei allen Requests als Bearer-Credential übertragen
+und beim Schließen der Browser-Sitzung oder beim Abmelden entfernt. Ein `401`
+führt zurück zum Login; `403`, `409` und `429` werden als unterscheidbare,
+verständliche Aktionsfehler angezeigt. Tokens gehören weder in die URL noch in
+den dauerhaften `localStorage`.
+
+Der Browser bleibt standardmäßig Local-first. Die lesende API-Anbindung kann für die Migration explizit aktiviert werden:
+
+```text
+http://127.0.0.1:4173/?data-source=api&api-url=http://127.0.0.1:3000
+```
+
+Der Client lädt dann die zugänglichen Boards aus PostgreSQL. Der vollständige Task-Lebenszyklus einschließlich Erstellen, Bearbeiten, Statusformular, Drag-and-drop, Zuweisen, Todos und Löschen wird bereits an den Server geschrieben. Auch Board-Metadaten und der vollständige Stage-Lebenszyklus werden dauerhaft gespeichert. Änderungen an Mitgliedern sowie das Erstellen und Löschen ganzer Boards sind in diesem Zwischenstand nur im Arbeitsspeicher sichtbar; ein Neuladen stellt dafür den Datenbankstand wieder her. Ist die API beim Start nicht erreichbar, verwendet der Client weiterhin den lokalen Workspace.
+
+### Bestehenden Workspace prüfen und importieren
+
+Ein vom Local-first-Client exportiertes JaDy-Board-Backup kann zunächst ohne
+Datenbankzugriff validiert werden:
+
+```bash
+npm run db:import -- --dry-run ./jady-board-backup.json
+```
+
+Der echte Import benötigt `DATABASE_URL` und ein vollständig migriertes Schema:
+
+```bash
+npm run db:migrate
+npm run db:import -- ./jady-board-backup.json
+```
+
+Der Import bildet Legacy-IDs deterministisch auf UUIDs ab und übernimmt
+Benutzer, Einstellungen, Boards, Mitglieder, Stages, Übergänge, Tasks und Todos
+in einer gemeinsamen Transaktion. Ein inhaltlich identisches Backup wird nur
+einmal akzeptiert.
 
 Das initiale relationale Schema trennt Benutzer, Präferenzen, Boards, Mitglieder, Stages, Stage-Übergänge, Tasks und Todos. Positions- und Versionsfelder bereiten sortierbare Inhalte und optimistische Nebenläufigkeitskontrolle vor.
 
 ## Aktuelle Grenzen
 
-- Daten werden ausschließlich lokal im aktuellen Browser gespeichert.
-- Es gibt keine Anmeldung, Zugriffskontrolle oder Mehrgeräte-Synchronisierung.
+- Der Browser-Client arbeitet standardmäßig weiterhin mit seinem lokalen Workspace. Im optionalen API-Modus werden neue Tasks, Task-Metadaten und Statusänderungen aus dem Task-Dialog bereits gespeichert; alle anderen Änderungen gehen beim Neuladen weiterhin verloren.
+- Clerk stellt die interaktive Browser-Anmeldung bereit. Registrierung, Einladungen, Teams und weitere Account-Verknüpfungsabläufe sind noch nicht als Produktprozesse umgesetzt.
 - Gleichzeitige Bearbeitung durch mehrere Personen wird nicht unterstützt.
 - Automatische oder zeitgesteuerte Backups sind nicht vorhanden; Exporte müssen manuell ausgelöst werden.
 - Benutzerprofile simulieren Teamrollen nur innerhalb des lokalen Workspace.

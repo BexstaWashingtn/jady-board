@@ -28,6 +28,18 @@
  * @property {(taskId: string, targetColumnId: string) => string} moveRejectionMessage
  * @property {(taskId: string, targetColumnId: string) => string} moveRejectionLabel
  * @property {(workspace: import("../board.persistence.js").BoardWorkspace) => void} replaceWorkspace
+ * @property {((boardId: string, task: import("../board.state.js").BoardTask) => Promise<Partial<import("../board.state.js").BoardTask>>)|undefined} updateTaskRemote
+ * @property {((boardId: string, task: import("../board.state.js").BoardTask, stageId: string, targetIndex: number) => Promise<{version: number}>)|undefined} moveTaskRemote
+ * @property {((boardId: string, task: import("../board.state.js").BoardTask, stageId: string) => Promise<import("../board.state.js").BoardTask>)|undefined} createTaskRemote
+ * @property {((boardId: string, task: import("../board.state.js").BoardTask) => Promise<{assigneeId: string|null, version: number}>)|undefined} assignTaskRemote
+ * @property {((boardId: string, task: import("../board.state.js").BoardTask) => Promise<{todos: import("../board.state.js").TaskTodo[], version: number}>)|undefined} syncTaskTodosRemote
+ * @property {((boardId: string, task: import("../board.state.js").BoardTask) => Promise<void>)|undefined} deleteTaskRemote
+ * @property {((boardId: string, stage: import("../board.state.js").BoardColumn) => Promise<Partial<import("../board.state.js").BoardColumn>>)|undefined} updateStageRemote
+ * @property {((boardId: string, stage: import("../board.state.js").BoardColumn) => Promise<import("../board.state.js").BoardColumn>)|undefined} createStageRemote
+ * @property {((boardId: string, stage: import("../board.state.js").BoardColumn, targetIndex: number) => Promise<{position: number, version: number}>)|undefined} moveStageRemote
+ * @property {((boardId: string, stage: import("../board.state.js").BoardColumn, moveTasksTo: string|null) => Promise<void>)|undefined} deleteStageRemote
+ * @property {((boardId: string, state: import("../board.state.js").BoardState) => Promise<{name: string, path: string, description: string, version: number}>)|undefined} updateBoardRemote
+ * @property {(() => void)|undefined} logoutRemote
  */
 
 export {};

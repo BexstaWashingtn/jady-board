@@ -62,7 +62,7 @@ export async function migrateDatabase(database, directory = migrationsDirectory)
 
 async function main() {
   const config = loadConfig();
-  const database = createDatabase(config);
+  const database = createDatabase(config, config.databaseMigrationUrl);
   try {
     await migrateDatabase(database);
     process.stdout.write("Database migrations completed.\n");

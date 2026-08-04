@@ -22,6 +22,8 @@ if (process.platform !== "win32" || process.env.CI) {
 
 export default defineConfig({
   testDir: "./e2e",
+  // Avoid Windows file-lock collisions with an interrupted previous run.
+  outputDir: process.env.CI ? "test-results" : `playwright-results-${process.pid}`,
   globalSetup: "./e2e/global-setup.js",
   fullyParallel: true,
   forbidOnly: Boolean(process.env.CI),

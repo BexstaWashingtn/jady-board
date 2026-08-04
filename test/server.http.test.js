@@ -3,6 +3,7 @@ import { afterEach, describe, test } from "node:test";
 import { createServer } from "node:http";
 
 import { createApiHandler } from "../server/src/http/app.js";
+import { createBearerIdentityResolver, IdentityNotLinkedError } from "../server/src/http/request-identity.js";
 
 /** @type {import("node:http").Server[]} */
 const servers = [];
@@ -12,6 +13,36 @@ afterEach(async () => {
 });
 
 describe("Server-Health-API", () => {
+  test("veröffentlicht ausschließlich die browserseitige Auth-Konfiguration", async () => {
+    const server = createServer(createApiHandler({
+      database: { query: async () => ({ rows: [] }) },
+      authPublicConfig: { mode: "clerk", publishableKey: "pk_test_public" },
+    }));
+    const baseUrl = await start(server);
+    const response = await fetch(`${baseUrl}/api/auth/config`);
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), { mode: "clerk", publishableKey: "pk_test_public" });
+  });
+
+  test("unterscheidet eine nicht verknüpfte Clerk-Identität von fehlender Anmeldung", async () => {
+    const server = createServer(createApiHandler({
+      database: { query: async () => ({ rows: [] }) },
+      identityRequired: true,
+      resolveIdentity: async () => { throw new IdentityNotLinkedError(); },
+    }));
+    const baseUrl = await start(server);
+    const response = await fetch(`${baseUrl}/api/boards`);
+
+    assert.equal(response.status, 403);
+    assert.deepEqual(await response.json(), {
+      error: {
+        code: "IDENTITY_NOT_LINKED",
+        message: "The authenticated identity is not linked to a JaDy Board user.",
+      },
+    });
+  });
+
   test("meldet den laufenden Prozess als gesund", async () => {
     const baseUrl = await listen({ query: async () => ({ rows: [] }) });
     const response = await fetch(`${baseUrl}/api/health`);
@@ -19,6 +50,46 @@ describe("Server-Health-API", () => {
     assert.equal(response.status, 200);
     assert.deepEqual(await response.json(), { status: "ok" });
     assert.match(response.headers.get("content-type") ?? "", /application\/json/);
+    assert.equal(response.headers.get("x-content-type-options"), "nosniff");
+    assert.equal(response.headers.get("x-frame-options"), "DENY");
+    assert.equal(response.headers.get("referrer-policy"), "no-referrer");
+    assert.match(response.headers.get("x-request-id") ?? "", /^[0-9a-f-]{36}$/);
+  });
+
+  test("übernimmt sichere Request-IDs und begrenzt geschützte Endpunkte", async () => {
+    const rateLimiter = { consume: () => ({ allowed: false, limit: 1, remaining: 0, resetAt: Date.now() + 1000 }) };
+    const server = createServer(createApiHandler({
+      database: { query: async () => ({ rows: [] }) }, rateLimiter,
+    }));
+    const baseUrl = await start(server);
+    const health = await fetch(`${baseUrl}/api/health`, { headers: { "X-Request-ID": "request-12345678" } });
+    assert.equal(health.status, 200);
+    assert.equal(health.headers.get("x-request-id"), "request-12345678");
+    const limited = await fetch(`${baseUrl}/api/boards`, { headers: { "X-Request-ID": "request-abcdefgh" } });
+    assert.equal(limited.status, 429);
+    assert.equal(limited.headers.get("x-ratelimit-limit"), "1");
+    assert.equal(limited.headers.get("retry-after"), "1");
+    assert.deepEqual(await limited.json(), {
+      error: { code: "RATE_LIMITED", message: "Too many requests." }, requestId: "request-abcdefgh",
+    });
+  });
+
+  test("erlaubt nur den explizit konfigurierten Browser-Origin", async () => {
+    const server = createServer(createApiHandler({
+      database: { query: async () => ({ rows: [] }) },
+      corsOrigin: "https://board.example.com",
+    }));
+    const baseUrl = await start(server);
+
+    const allowed = await fetch(`${baseUrl}/api/health`, { headers: { Origin: "https://board.example.com" } });
+    assert.equal(allowed.status, 200);
+    assert.equal(allowed.headers.get("access-control-allow-origin"), "https://board.example.com");
+    assert.equal(allowed.headers.get("vary"), "Origin");
+
+    const rejected = await fetch(`${baseUrl}/api/health`, { headers: { Origin: "https://evil.example" } });
+    assert.equal(rejected.status, 403);
+    assert.equal((await rejected.json()).error.code, "ORIGIN_NOT_ALLOWED");
+    assert.equal(rejected.headers.get("access-control-allow-origin"), null);
   });
 
   test("meldet eine erreichbare Datenbank als bereit", async () => {
@@ -64,11 +135,267 @@ describe("Server-Health-API", () => {
   });
 });
 
+describe("Board-Lese-API", () => {
+  const userId = "8acf3017-cf6e-589b-bd47-a1d8ccec16a8";
+  const boardId = "46ed3b71-86cb-5eb7-a01e-dd5885e41c6a";
+
+  test("verlangt im Bearer-Modus ein verifiziertes Zugriffstoken", async () => {
+    const token = "abcdefghijklmnopqrstuvwxyz-123456";
+    const boardService = { async listBoards() { return []; }, async getBoard() { return null; } };
+    const server = createServer(createApiHandler({
+      database: { query: async () => ({ rows: [] }) }, boardService,
+      resolveIdentity: createBearerIdentityResolver([{ userId, token }]), identityRequired: true,
+    }));
+    const baseUrl = await start(server);
+    assert.equal((await fetch(`${baseUrl}/api/boards`)).status, 401);
+    assert.equal((await fetch(`${baseUrl}/api/boards`, { headers: { Authorization: "Bearer wrong" } })).status, 401);
+    const authenticated = await fetch(`${baseUrl}/api/boards`, { headers: { Authorization: `Bearer ${token}` } });
+    assert.equal(authenticated.status, 200);
+    assert.equal((await authenticated.json()).currentUserId, userId);
+  });
+
+  test("ermittelt die Identitaet pro Request ueber einen Resolver", async () => {
+    const boardService = {
+      async listBoards(value) { return [{ id: boardId, name: value }]; },
+      async getBoard() { return null; },
+    };
+    const server = createServer(createApiHandler({
+      database: { query: async () => ({ rows: [] }) },
+      boardService,
+      resolveIdentity: (request) => request.headers["x-test-user"] === userId ? userId : null,
+    }));
+    const baseUrl = await start(server);
+
+    assert.equal((await fetch(`${baseUrl}/api/boards`)).status, 503);
+    const response = await fetch(`${baseUrl}/api/boards`, { headers: { "X-Test-User": userId } });
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), {
+      currentUserId: userId,
+      boards: [{ id: boardId, name: userId }],
+    });
+  });
+
+  test("weist nicht verifizierbare Request-Identitaeten zurueck", async () => {
+    const boardService = { async listBoards() { return []; }, async getBoard() { return null; } };
+    const resolvers = [() => "not-a-uuid", () => { throw new Error("invalid token"); }];
+    for (const resolveIdentity of resolvers) {
+      const server = createServer(createApiHandler({
+        database: { query: async () => ({ rows: [] }) }, boardService, resolveIdentity,
+      }));
+      const response = await fetch(`${await start(server)}/api/boards`);
+      assert.equal(response.status, 401);
+      assert.equal((await response.json()).error.code, "IDENTITY_REJECTED");
+    }
+  });
+
+  test("verlangt eine konfigurierte Entwicklungsidentität", async () => {
+    const baseUrl = await listen({ query: async () => ({ rows: [] }) });
+    const response = await fetch(`${baseUrl}/api/boards`);
+
+    assert.equal(response.status, 503);
+    assert.equal((await response.json()).error.code, "IDENTITY_NOT_CONFIGURED");
+  });
+
+  test("liefert die zugänglichen Boards des Entwicklungsbenutzers", async () => {
+    let receivedUserId = "";
+    const boardService = {
+      async listBoards(value) { receivedUserId = value; return [{ id: boardId, name: "Board" }]; },
+      async getBoard() { return null; },
+    };
+    const baseUrl = await listenApi({ boardService, currentUserId: userId });
+    const response = await fetch(`${baseUrl}/api/boards`);
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), { currentUserId: userId, boards: [{ id: boardId, name: "Board" }] });
+    assert.equal(receivedUserId, userId);
+  });
+
+  test("validiert Board-IDs und verbirgt unzugängliche Boards", async () => {
+    const boardService = { async listBoards() { return []; }, async getBoard() { return null; } };
+    const baseUrl = await listenApi({ boardService, currentUserId: userId });
+
+    const invalid = await fetch(`${baseUrl}/api/boards/not-a-uuid`);
+    assert.equal(invalid.status, 400);
+    assert.equal((await invalid.json()).error.code, "INVALID_BOARD_ID");
+
+    const missing = await fetch(`${baseUrl}/api/boards/${boardId}`);
+    assert.equal(missing.status, 404);
+    assert.equal((await missing.json()).error.code, "BOARD_NOT_FOUND");
+  });
+
+  test("liefert ein zugängliches Board", async () => {
+    const board = { id: boardId, version: 1, columns: [], tasks: {} };
+    const boardService = { async listBoards() { return []; }, async getBoard() { return board; } };
+    const baseUrl = await listenApi({ boardService, currentUserId: userId });
+    const response = await fetch(`${baseUrl}/api/boards/${boardId}`);
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), { board });
+  });
+
+  test("liefert bei unerwarteten Servicefehlern einen stabilen Fehlervertrag", async () => {
+    const boardService = {
+      async listBoards() { throw new Error("database failed"); },
+      async getBoard() { throw new Error("database failed"); },
+    };
+    const baseUrl = await listenApi({ boardService, currentUserId: userId });
+
+    for (const path of ["/api/boards", `/api/boards/${boardId}`]) {
+      const response = await fetch(`${baseUrl}${path}`);
+      assert.equal(response.status, 500);
+      assert.deepEqual(await response.json(), {
+        error: { code: "INTERNAL_ERROR", message: "The request could not be completed." },
+      });
+    }
+  });
+});
+
+describe("Task-Schreib-API", () => {
+  const userId = "8acf3017-cf6e-589b-bd47-a1d8ccec16a8";
+  const boardId = "46ed3b71-86cb-5eb7-a01e-dd5885e41c6a";
+  const taskId = "912e8124-aa18-5848-bac7-3486be614b78";
+
+  test("aktualisiert Task-Metadaten und beantwortet CORS-Preflights", async () => {
+    let received;
+    const boardService = {
+      async listBoards() { return []; }, async getBoard() { return null; },
+      async updateTask(...args) {
+        received = args;
+        return { status: /** @type {const} */ ("updated"), task: { id: taskId, title: "Neu", version: 2 } };
+      },
+    };
+    const baseUrl = await listenApi({ boardService, currentUserId: userId });
+    const preflight = await fetch(`${baseUrl}/api/boards/${boardId}/tasks/${taskId}`, { method: "OPTIONS" });
+    assert.equal(preflight.status, 204);
+    assert.match(preflight.headers.get("access-control-allow-methods") ?? "", /PATCH/);
+    const body = { title: "Neu", category: "Core", priority: "high", dueDate: null, version: 1 };
+    const response = await fetch(`${baseUrl}/api/boards/${boardId}/tasks/${taskId}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+    });
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), { task: { id: taskId, title: "Neu", version: 2 } });
+    assert.deepEqual(received, [boardId, taskId, userId, body]);
+  });
+
+  test("liefert stabile Fehler für ungültige Requests und Versionskonflikte", async () => {
+    const boardService = {
+      async listBoards() { return []; }, async getBoard() { return null; },
+      async updateTask() { return { status: /** @type {const} */ ("conflict") }; },
+    };
+    const baseUrl = await listenApi({ boardService, currentUserId: userId });
+    const invalidId = await fetch(`${baseUrl}/api/boards/no/tasks/${taskId}`, { method: "PATCH", body: "{}" });
+    assert.equal(invalidId.status, 400);
+    const invalidJson = await fetch(`${baseUrl}/api/boards/${boardId}/tasks/${taskId}`, { method: "PATCH", body: "{" });
+    assert.equal(invalidJson.status, 400);
+    const conflict = await fetch(`${baseUrl}/api/boards/${boardId}/tasks/${taskId}`, { method: "PATCH", body: "{}" });
+    assert.equal(conflict.status, 409);
+    assert.equal((await conflict.json()).error.code, "TASK_VERSION_CONFLICT");
+  });
+
+  test("verschiebt Tasks und reicht Workflow-Ablehnungen durch", async () => {
+    let rejected = false;
+    const boardService = {
+      async listBoards() { return []; }, async getBoard() { return null; },
+      async updateTask() { return { status: /** @type {const} */ ("not_found") }; },
+      async moveTask(board, task, user, body) {
+        if (rejected) return { status: /** @type {const} */ ("rejected"), code: "WIP_LIMIT_REACHED", message: "Full." };
+        assert.deepEqual([board, task, user, body], [boardId, taskId, userId, { stageId: "c358d08d-6fdd-5752-8fe2-a4004c0e5ad9", targetIndex: 2, version: 3 }]);
+        return { status: /** @type {const} */ ("moved"), task: { id: taskId, stageId: body.stageId, position: 2, version: 4 } };
+      },
+    };
+    const baseUrl = await listenApi({ boardService, currentUserId: userId });
+    const options = { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ stageId: "c358d08d-6fdd-5752-8fe2-a4004c0e5ad9", targetIndex: 2, version: 3 }) };
+    const response = await fetch(`${baseUrl}/api/boards/${boardId}/tasks/${taskId}/position`, options);
+    assert.equal(response.status, 200);
+    assert.equal((await response.json()).task.version, 4);
+    rejected = true;
+    const limited = await fetch(`${baseUrl}/api/boards/${boardId}/tasks/${taskId}/position`, options);
+    assert.equal(limited.status, 422);
+    assert.equal((await limited.json()).error.code, "WIP_LIMIT_REACHED");
+  });
+
+  test("erstellt Tasks über einen stabilen HTTP-Vertrag", async () => {
+    let received;
+    const createdTask = { id: taskId, title: "Neu", version: 1 };
+    const boardService = {
+      async listBoards() { return []; }, async getBoard() { return null; },
+      async updateTask() { return { status: /** @type {const} */ ("not_found") }; },
+      async moveTask() { return { status: /** @type {const} */ ("not_found") }; },
+      async createTask(board, user, body) { received = [board, user, body]; return { status: /** @type {const} */ ("created"), task: createdTask }; },
+    };
+    const baseUrl = await listenApi({ boardService, currentUserId: userId });
+    const body = { stageId: "c358d08d-6fdd-5752-8fe2-a4004c0e5ad9", title: "Neu", category: "Core", priority: "medium", assigneeId: null, dueDate: null };
+    const response = await fetch(`${baseUrl}/api/boards/${boardId}/tasks`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+    });
+    assert.equal(response.status, 201);
+    assert.deepEqual(await response.json(), { task: createdTask });
+    assert.deepEqual(received, [boardId, userId, body]);
+  });
+
+  test("aktualisiert Task-Zuweisungen über einen stabilen HTTP-Vertrag", async () => {
+    const boardService = {
+      async listBoards() { return []; }, async getBoard() { return null; },
+      async updateTask() { return { status: /** @type {const} */ ("not_found") }; },
+      async moveTask() { return { status: /** @type {const} */ ("not_found") }; },
+      async createTask() { return { status: /** @type {const} */ ("not_found") }; },
+      async assignTask() { return { status: /** @type {const} */ ("updated"), task: { id: taskId, assigneeId: userId, version: 2 } }; },
+    };
+    const baseUrl = await listenApi({ boardService, currentUserId: userId });
+    const response = await fetch(`${baseUrl}/api/boards/${boardId}/tasks/${taskId}/assignment`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ assigneeId: userId, version: 1 }),
+    });
+    assert.equal(response.status, 200);
+    assert.deepEqual((await response.json()).task, { id: taskId, assigneeId: userId, version: 2 });
+  });
+
+  test("synchronisiert Todos über einen stabilen HTTP-Vertrag", async () => {
+    const boardService = {
+      async listBoards() { return []; }, async getBoard() { return null; },
+      async updateTask() { return { status: /** @type {const} */ ("not_found") }; }, async moveTask() { return { status: /** @type {const} */ ("not_found") }; },
+      async createTask() { return { status: /** @type {const} */ ("not_found") }; }, async assignTask() { return { status: /** @type {const} */ ("not_found") }; },
+      async syncTaskTodos() { return { status: /** @type {const} */ ("updated"), task: { id: taskId, todos: [], version: 2 } }; },
+    };
+    const baseUrl = await listenApi({ boardService, currentUserId: userId });
+    const response = await fetch(`${baseUrl}/api/boards/${boardId}/tasks/${taskId}/todos`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ todos: [], version: 1 }),
+    });
+    assert.equal(response.status, 200);
+    assert.deepEqual((await response.json()).task, { id: taskId, todos: [], version: 2 });
+  });
+
+  test("löscht Tasks versioniert über HTTP", async () => {
+    const boardService = {
+      async listBoards() { return []; }, async getBoard() { return null; }, async updateTask() { return { status: /** @type {const} */ ("not_found") }; },
+      async moveTask() { return { status: /** @type {const} */ ("not_found") }; }, async createTask() { return { status: /** @type {const} */ ("not_found") }; },
+      async assignTask() { return { status: /** @type {const} */ ("not_found") }; }, async syncTaskTodos() { return { status: /** @type {const} */ ("not_found") }; },
+      async deleteTask(_board, _task, _user, version) { assert.equal(version, "2"); return { status: /** @type {const} */ ("deleted") }; },
+    };
+    const baseUrl = await listenApi({ boardService, currentUserId: userId });
+    const response = await fetch(`${baseUrl}/api/boards/${boardId}/tasks/${taskId}?version=2`, { method: "DELETE" });
+    assert.equal(response.status, 204);
+  });
+});
+
 /**
  * @param {{query: (sql: unknown) => Promise<unknown>}} database
  */
 async function listen(database) {
   const server = createServer(createApiHandler({ database }));
+  return start(server);
+}
+
+/** @param {{boardService: import("../server/src/modules/boards/board.service.js").BoardService, currentUserId: string}} dependencies */
+async function listenApi(dependencies) {
+  const server = createServer(createApiHandler({
+    database: { query: async () => ({ rows: [] }) },
+    ...dependencies,
+  }));
+  return start(server);
+}
+
+/** @param {import("node:http").Server} server */
+async function start(server) {
   servers.push(server);
   await new Promise((resolve, reject) => {
     server.once("error", reject);
